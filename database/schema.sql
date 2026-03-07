@@ -418,6 +418,9 @@ CREATE TABLE IF NOT EXISTS hospital_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure logo_url exists even if table was created earlier
+ALTER TABLE hospital_settings ADD COLUMN IF NOT EXISTS logo_url TEXT;
+
 -- Pre-populate the single row if it doesn't exist
 INSERT INTO hospital_settings (id, name, address, contact_info)
 VALUES (1, 'Smart Hospital', '123 Health Ave, Medical District', 'Phone: +880-1234-567890 | Email: contact@smarthospital.com')
