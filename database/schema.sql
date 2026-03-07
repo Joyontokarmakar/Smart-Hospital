@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- Ensure columns exist in case table was created before notifications feature
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_new_visits BOOLEAN DEFAULT false;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_new_tests BOOLEAN DEFAULT false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
 
 -- 2. Doctors Info Table (Supplementary info for doctors)
 CREATE TABLE IF NOT EXISTS doctors_info (
@@ -54,6 +55,9 @@ CREATE TABLE IF NOT EXISTS patients (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure missing columns exist in patients table
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS blood_group TEXT CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'));
 
 -- 5. Visits Table (Doctor Appointments)
 CREATE TABLE IF NOT EXISTS visits (
@@ -472,5 +476,3 @@ USING (
   bucket_id = 'branding' AND 
   public.get_my_role() IN ('super_admin', 'diag_manager')
 );
-
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
