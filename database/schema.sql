@@ -191,11 +191,9 @@ DROP POLICY IF EXISTS "Allow authenticated all" ON doctors_info;
 DROP POLICY IF EXISTS "Allow authenticated all" ON tests;
 DROP POLICY IF EXISTS "Allow authenticated all" ON patients;
 DROP POLICY IF EXISTS "Allow selective visit access" ON visits;
-DROP POLICY IF EXISTS "Allow authenticated all" ON visits;
 DROP POLICY IF EXISTS "Allow authenticated insert" ON visits;
 DROP POLICY IF EXISTS "Allow authenticated update" ON visits;
 DROP POLICY IF EXISTS "Allow selective bill access" ON bills;
-DROP POLICY IF EXISTS "Allow authenticated all" ON bills;
 DROP POLICY IF EXISTS "Allow authenticated insert" ON bills;
 DROP POLICY IF EXISTS "Allow authenticated update" ON bills;
 DROP POLICY IF EXISTS "Allow authenticated all" ON bill_items;
@@ -429,11 +427,47 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE hospital_settings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow authenticated read access" ON hospital_settings;
-DROP POLICY IF EXISTS "Allow super admin update" ON hospital_settings;
 DROP POLICY IF EXISTS "Allow admin/manager update" ON hospital_settings;
 
 CREATE POLICY "Allow authenticated read access" ON hospital_settings FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow admin/manager update" ON hospital_settings FOR UPDATE USING (public.get_my_role() IN ('super_admin', 'diag_manager'));
 
 -- STORAGE BUCKET SETUP
+-- 1. Create the bucket
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('branding', 'branding', true) 
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 2. Drop existing storage policies
+DROP POLICY IF EXISTS "Branding Public Access" ON storage.objects;
+DROP POLICY IF EXISTS "Branding Admin/Manager Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Branding Admin/Manager Update" ON storage.objects;
+DROP POLICY IF EXISTS "Branding Admin/Manager Delete" ON storage.objects;
+
+-- 3. Create robust storage policies
+CREATE POLICY "Branding Public Access" ON storage.objects 
+FOR SELECT TO public
+USING (bucket_id = 'branding');
+
+CREATE POLICY "Branding Admin/Manager Upload" ON storage.objects 
+FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'branding' AND 
+  public.get_my_role() IN ('super_admin', 'diag_manager')
+);
+
+CREATE POLICY "Branding Admin/Manager Update" ON storage.objects 
+FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'branding' AND 
+  public.get_my_role() IN ('super_admin', 'diag_manager')
+);
+
+CREATE POLICY "Branding Admin/Manager Delete" ON storage.objects 
+FOR DELETE TO authenticated
+USING (
+  bucket_id = 'branding' AND 
+  public.get_my_role() IN ('super_admin', 'diag_manager')
+);
+
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
