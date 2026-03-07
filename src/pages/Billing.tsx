@@ -3,11 +3,15 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Plus, Printer, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useSettings } from '../hooks/useSettings';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
+import { useNotification } from '../components/NotificationProvider';
 
 export default function Billing() {
   const { profile } = useAuth();
+  const { settings } = useSettings();
+  const { success, error: showError } = useNotification();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const patientId = searchParams.get('patient');
@@ -17,6 +21,7 @@ export default function Billing() {
   const [selectedTests, setSelectedTests] = useState<any[]>([]);
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [amountPaid, setAmountPaid] = useState<string>('');
 
   useEffect(() => {
     if (patientId) {
@@ -50,12 +55,25 @@ export default function Billing() {
     if (!testId) return;
     const test = allTests.find(t => t.id === testId);
     if (test && !selectedTests.find(t => t.id === test.id)) {
-      setSelectedTests([...selectedTests, { ...test, appliedDiscount: 0 }]);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setSelectedTests([...selectedTests, { 
+        ...test, 
+        appliedDiscount: 0,
+        expected_delivery: tomorrow.toISOString().split('T')[0]
+      }]);
     }
   };
 
   const handleRemoveTest = (testId: string) => {
     setSelectedTests(selectedTests.filter(t => t.id !== testId));
+  };
+
+  const handleDeliveryChange = (testId: string, value: string) => {
+    setSelectedTests(selectedTests.map(t => {
+      if (t.id === testId) return { ...t, expected_delivery: value };
+      return t;
+    }));
   };
 
   const handleDiscountChange = (testId: string, value: string) => {
@@ -77,6 +95,8 @@ export default function Billing() {
   const subtotal = selectedTests.reduce((sum, t) => sum + t.price, 0);
   const totalDiscount = selectedTests.reduce((sum, t) => sum + (t.appliedDiscount || 0), 0);
   const totalAmount = subtotal - totalDiscount;
+  const parsedAmountPaid = parseFloat(amountPaid) || 0;
+  const amountDue = totalAmount - parsedAmountPaid;
 
   const handleCreateBill = async () => {
     if (selectedTests.length === 0) return alert('Select at least one test.');
@@ -92,7 +112,9 @@ export default function Billing() {
           subtotal,
           total_discount: totalDiscount,
           total_amount: totalAmount,
-          status: 'paid'
+          amount_paid: parsedAmountPaid,
+          amount_due: amountDue,
+          status: amountDue > 0 ? 'pending' : 'paid'
         })
         .select()
         .single();
@@ -106,19 +128,21 @@ export default function Billing() {
         test_name: t.name,
         price: t.price,
         discount: t.appliedDiscount,
-        final_price: t.price - t.appliedDiscount
+        final_price: t.price - t.appliedDiscount,
+        expected_delivery: t.expected_delivery ? new Date(t.expected_delivery).toISOString() : null,
+        report_status: 'Pending'
       }));
 
       const { error: itemsError } = await supabase.from('bill_items').insert(billItems);
       if (itemsError) throw itemsError;
 
-      alert('Bill created! Proceeding to print preview.');
+      success('Bill created!', 'Proceeding to print preview.');
       // Keep it on this view but ready to print if we want, or just trigger window.print directly
       // Realistically we would navigate to a bill details page, but let's just trigger print
       setTimeout(() => window.print(), 500);
 
     } catch (err: any) {
-      alert(err.message || 'Error creating bill');
+      showError('Error creating bill', err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
@@ -177,16 +201,18 @@ export default function Billing() {
                   <CardTitle>Selected Tests</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-xs uppercase tracking-wider">
-                        <th className="px-6 py-4 font-semibold">Test</th>
-                        <th className="px-6 py-4 font-semibold text-right">Price</th>
-                        <th className="px-6 py-4 font-semibold text-right" title="Cannot exceed max discount">Discount (৳)</th>
-                        <th className="px-6 py-4 font-semibold text-right">Net Amount</th>
-                        <th className="px-6 py-4 font-semibold text-center">Action</th>
-                      </tr>
-                    </thead>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+                          <th className="px-6 py-4 font-semibold">Test</th>
+                          <th className="px-6 py-4 font-semibold text-right">Price</th>
+                          <th className="px-6 py-4 font-semibold text-right" title="Cannot exceed max discount">Disc. (৳)</th>
+                          <th className="px-6 py-4 font-semibold text-right">Net</th>
+                          <th className="px-6 py-4 font-semibold">Delivery Date</th>
+                          <th className="px-6 py-4 font-semibold text-center">Action</th>
+                        </tr>
+                      </thead>
                     <tbody className="divide-y divide-slate-100">
                       {selectedTests.map(t => {
                         const maxDiscAmt = t.price * (t.discount_percentage / 100);
@@ -210,6 +236,14 @@ export default function Billing() {
                             <td className="px-6 py-4 text-sm font-medium text-primary-700 text-right">
                               ৳{(t.price - t.appliedDiscount).toFixed(2)}
                             </td>
+                            <td className="px-6 py-4">
+                              <input 
+                                type="date"
+                                className="border border-slate-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-primary-500 min-w-[120px]"
+                                value={t.expected_delivery || ''}
+                                onChange={(e) => handleDeliveryChange(t.id, e.target.value)}
+                              />
+                            </td>
                             <td className="px-6 py-4 text-center">
                               <button onClick={() => handleRemoveTest(t.id)} className="text-error-500 hover:text-error-700 text-sm font-medium">Remove</button>
                             </td>
@@ -218,6 +252,7 @@ export default function Billing() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -232,8 +267,16 @@ export default function Billing() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="hidden print:block mb-8 text-center pt-8 border-b border-black pb-4">
-                    <h2 className="text-2xl font-bold uppercase">Smart Hospital</h2>
-                    <p className="text-sm">Diagnostic Cash Receipt</p>
+                    {settings?.logo_url ? (
+                      <div className="flex justify-center mb-4">
+                        <img src={settings.logo_url} alt="Hospital Logo" className="h-20 object-contain" />
+                      </div>
+                    ) : (
+                      <h2 className="text-2xl font-bold uppercase">{settings?.name || 'Smart Hospital'}</h2>
+                    )}
+                    <p className="text-sm mt-1">{settings?.address || '123 Health Ave'}</p>
+                    <p className="text-xs text-slate-600 mt-1 pb-2">{settings?.contact_info || 'Contact Info'}</p>
+                    <p className="text-sm font-semibold mt-2 inline-block border border-black px-4 py-1 rounded">Diagnostic Cash Receipt</p>
                   </div>
 
                   <div>
@@ -279,6 +322,27 @@ export default function Billing() {
                     <div className="flex justify-between text-lg font-bold text-slate-900 mt-4 pt-4 border-t border-slate-200 print:border-black print:text-xl">
                       <span>Total Amount</span>
                       <span>৳{totalAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 print:border-none print:p-0 mt-4">
+                    <div className="flex items-center justify-between mb-3 print:mb-2">
+                      <label className="text-sm font-medium text-slate-700 print:text-black">Advance / Amount Paid</label>
+                      <input 
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-32 text-right border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 print:border-none print:p-0 print:font-bold"
+                        value={amountPaid}
+                        onChange={(e) => setAmountPaid(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-700 print:text-black">Due Amount</span>
+                      <span className={`font-bold ${amountDue > 0 ? 'text-error-600' : 'text-success-600'} print:text-black`}>
+                        ৳{amountDue > 0 ? amountDue.toFixed(2) : '0.00'}
+                      </span>
                     </div>
                   </div>
 
@@ -336,6 +400,7 @@ export default function Billing() {
                   <th className="px-6 py-4 font-semibold">Date</th>
                   <th className="px-6 py-4 font-semibold">Patient Name</th>
                   <th className="px-6 py-4 font-semibold text-right">Total Amount</th>
+                  <th className="px-6 py-4 font-semibold text-right">Due</th>
                   <th className="px-6 py-4 font-semibold text-center">Status</th>
                 </tr>
               </thead>
@@ -354,9 +419,16 @@ export default function Billing() {
                       <td className="px-6 py-4 text-sm text-slate-600">{new Date(bill.created_at).toLocaleString()}</td>
                       <td className="px-6 py-4 font-medium text-slate-900">{bill.patients?.name || 'Unknown'}</td>
                       <td className="px-6 py-4 text-right font-medium text-slate-700">৳{bill.total_amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right font-medium text-error-600">
+                        {bill.amount_due > 0 ? `৳${bill.amount_due.toFixed(2)}` : '-'}
+                      </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700 border border-success-200">
-                          Paid
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                          ${bill.status === 'paid' ? 'bg-success-50 text-success-700 border-success-200' : ''}
+                          ${bill.status === 'pending' ? 'bg-warning-50 text-warning-700 border-warning-200' : ''}
+                          ${bill.status === 'cancelled' ? 'bg-error-50 text-error-700 border-error-200' : ''}
+                        `}>
+                          <span className="capitalize">{bill.status}</span>
                         </span>
                       </td>
                     </tr>

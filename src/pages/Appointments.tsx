@@ -5,9 +5,11 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
+import { useNotification } from '../components/NotificationProvider';
 
 export default function Appointments() {
   const { profile } = useAuth();
+  const { success, error: showError, warning, showNotification } = useNotification();
   const [searchParams] = useSearchParams();
   const patientIdParams = searchParams.get('patient');
   
@@ -21,6 +23,7 @@ export default function Appointments() {
   // Form State (for Receptionist)
   const [selectedPatient, setSelectedPatient] = useState(patientIdParams || '');
   const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [session, setSession] = useState<'Morning' | 'Evening'>('Morning');
   const [submitting, setSubmitting] = useState(false);
 
   // Doctor Filters
@@ -50,7 +53,7 @@ export default function Appointments() {
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('New Patient Assigned', { body: 'Check your queue list.' });
           } else {
-            alert('New Patient Assigned to your queue!');
+            showNotification('New Patient Assigned', 'Check your queue list.', 'visit');
           }
         }
       )
@@ -109,22 +112,39 @@ export default function Appointments() {
 
   const handleCreateVisit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatient || !selectedDoctor) return alert('Select patient and doctor');
+    if (!selectedPatient || !selectedDoctor) return warning('Selection Required', 'Please select both a patient and a doctor.');
     setSubmitting(true);
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Get max serial number for the session today
+    const { data: maxSerialData } = await supabase
+      .from('visits')
+      .select('serial_number')
+      .eq('doctor_id', selectedDoctor)
+      .eq('visit_date', today)
+      .eq('session', session)
+      .order('serial_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextSerial = (maxSerialData?.serial_number || 0) + 1;
 
     const { error } = await supabase.from('visits').insert({
       patient_id: selectedPatient,
       doctor_id: selectedDoctor,
       receptionist_id: profile?.id,
       status: 'queued',
-      visit_date: new Date().toISOString().split('T')[0]
+      visit_date: today,
+      session: session,
+      serial_number: nextSerial
     });
 
     setSubmitting(false);
     if (error) {
-      alert(error.message);
+      showError('Assignment Failed', error.message);
     } else {
-      alert('Doctor assigned successfully!');
+      success('Doctor Assigned', 'Patient has been added to the queue.');
       setSelectedPatient('');
       setSelectedDoctor('');
       fetchVisitsForReceptionist();
@@ -189,6 +209,18 @@ export default function Appointments() {
                   ))}
                 </select>
               </div>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Session</label>
+                <select
+                  value={session}
+                  onChange={(e) => setSession(e.target.value as 'Morning' | 'Evening')}
+                  className="w-full border-slate-200 rounded-lg focus:ring-primary-500 py-2.5 px-3 border outline-none bg-slate-50"
+                  required
+                >
+                  <option value="Morning">Morning</option>
+                  <option value="Evening">Evening</option>
+                </select>
+              </div>
               <Button type="submit" isLoading={submitting} leftIcon={<UserPlus className="w-4 h-4" />}>
                 Assign
               </Button>
@@ -207,6 +239,7 @@ export default function Appointments() {
                   <th className="px-6 py-4 font-semibold">Date</th>
                   <th className="px-6 py-4 font-semibold">Patient</th>
                   <th className="px-6 py-4 font-semibold">Assigned Doctor</th>
+                  <th className="px-6 py-4 font-semibold">Session & Serial</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
                 </tr>
               </thead>
@@ -216,6 +249,9 @@ export default function Appointments() {
                     <td className="px-6 py-4 text-sm">{new Date(v.created_at).toLocaleDateString()}</td>
                     <td className="px-6 py-4 font-medium">{v.patients?.name}</td>
                     <td className="px-6 py-4 text-slate-600">Dr. {v.profiles?.full_name}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {v.session} <span className="font-bold text-slate-800 ml-1">#{v.serial_number}</span>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
                         ${v.status === 'queued' ? 'bg-warning-50 text-warning-700' : 
@@ -282,6 +318,9 @@ export default function Appointments() {
                             <p className="text-xs text-slate-500">
                               {v.patients?.age ? `${v.patients.age}y` : ''} {v.patients?.gender ? `, ${v.patients.gender}` : ''}
                             </p>
+                            <p className="text-xs font-semibold text-primary-600 mt-1">
+                              {v.session} Session - Serial #{v.serial_number}
+                            </p>
                           </div>
                           <span className="text-xs font-medium bg-warning-100 text-warning-800 px-2 py-0.5 rounded">
                             {v.status}
@@ -321,7 +360,7 @@ export default function Appointments() {
                     <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-xs uppercase tracking-wider">
                       <th className="px-6 py-4 font-semibold">Date</th>
                       <th className="px-6 py-4 font-semibold">Patient Name</th>
-                      <th className="px-6 py-4 font-semibold">Phone</th>
+                      <th className="px-6 py-4 font-semibold">Session & Serial</th>
                       <th className="px-6 py-4 font-semibold">Status</th>
                     </tr>
                   </thead>
@@ -334,8 +373,13 @@ export default function Appointments() {
                       historyList.map(v => (
                         <tr key={v.id} className="hover:bg-slate-50/50">
                           <td className="px-6 py-4 text-sm text-slate-600">{new Date(v.created_at).toLocaleString()}</td>
-                          <td className="px-6 py-4 font-medium text-slate-900">{v.patients?.name}</td>
-                          <td className="px-6 py-4 text-sm text-slate-600">{v.patients?.phone}</td>
+                          <td className="px-6 py-4 font-medium text-slate-900">
+                            {v.patients?.name}
+                            <div className="text-xs text-slate-500 font-normal">{v.patients?.phone}</div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600">
+                            {v.session} <span className="font-bold text-slate-800 ml-1">#{v.serial_number}</span>
+                          </td>
                           <td className="px-6 py-4">
                             <span className="capitalize text-xs font-medium px-2 py-1 bg-slate-100 rounded text-slate-600 border border-slate-200">
                               {v.status.replace('_', ' ')}

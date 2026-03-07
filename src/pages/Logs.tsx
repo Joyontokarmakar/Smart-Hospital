@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useSettings } from '../hooks/useSettings';
 
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
 
 export default function Logs() {
+  const { settings } = useSettings();
   const [logs, setLogs] = useState<any[]>([]);
   const [receptionists, setReceptionists] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,7 +115,7 @@ export default function Logs() {
         {/* Printable Area */}
         <CardContent className="p-0 print:p-0">
           <div className="hidden print:block mb-8 text-center pt-8">
-            <h2 className="text-2xl font-bold">Smart Hospital and Diagnostic</h2>
+            <h2 className="text-2xl font-bold">{settings?.name || 'Smart Hospital and Diagnostic'}</h2>
             <h3 className="text-xl mt-2 border-b border-black pb-4 inline-block">Receptionist Login/Logout Report</h3>
             <div className="mt-4 flex justify-between text-sm">
               <p><strong>Date:</strong> {selectedDate || 'All Dates'}</p>

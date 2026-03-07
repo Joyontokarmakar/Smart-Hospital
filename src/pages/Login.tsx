@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, Lock, Mail, Loader2 } from 'lucide-react';
+import { Stethoscope, Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useSettings } from '../hooks/useSettings';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const { session } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,10 +30,23 @@ export default function Login() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      let signInData: any = {};
+      
+      if (identifier.includes('@')) {
+        signInData = { email: identifier, password };
+      } else {
+        // Phone validation: Must start with 01 and be exactly 11 digits
+        const phoneRegex = /^01\d{9}$/;
+        if (!phoneRegex.test(identifier)) {
+          throw new Error('Please enter a valid email or an 11-digit phone number starting with 01 (e.g., 01521305180).');
+        }
+        // Assuming Supabase expects the phone number with a country code, you might need to prepend it
+        // Example: signInData = { phone: '+88' + identifier, password };
+        // For now using the identifier directly
+        signInData = { phone: '+88' + identifier, password }; 
+      }
+
+      const { error } = await supabase.auth.signInWithPassword(signInData);
 
       if (error) throw error;
       
@@ -53,12 +69,16 @@ export default function Login() {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="flex justify-center">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center border border-primary-100 rotate-3 hover:rotate-0 transition-transform duration-300">
-            <Stethoscope className="w-8 h-8 text-primary-600" />
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-lg flex items-center justify-center border border-primary-100 rotate-3 hover:rotate-0 transition-transform duration-300 overflow-hidden">
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt="Logo" className="w-full h-full object-contain p-2" />
+            ) : (
+              <Stethoscope className="w-8 h-8 text-primary-600" />
+            )}
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-          Smart Hospital Portal
+          {settings?.name || 'Smart Hospital Portal'}
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
           Sign in to access your dashboard
@@ -76,21 +96,21 @@ export default function Login() {
 
           <form className="space-y-6" onSubmit={handleLogin}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="email">
-                Email address
+              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="identifier">
+                Email or Phone Number
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
                 </div>
                 <input
-                  id="email"
-                  type="email"
+                  id="identifier"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="appearance-none block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white/50 focus:bg-white"
-                  placeholder="admin@hospital.com"
+                  placeholder="admin@hospital.com or 01XXXXXXXXX"
                 />
               </div>
             </div>
@@ -105,13 +125,20 @@ export default function Login() {
                 </div>
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white/50 focus:bg-white"
+                  className="appearance-none block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white/50 focus:bg-white"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 

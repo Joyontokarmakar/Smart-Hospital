@@ -28,9 +28,10 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
 
   // Form State
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
     full_name: '',
+    email: '',
+    login_phone: '',
+    password: '',
     role: 'receptionist' as UserRole,
     // Doctor specific fields
     degrees: '',
@@ -38,10 +39,29 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
     current_job_title: '',
     institution: '',
     phone_number: '',
+    bmdc_number: '',
+    // Notification preferences
+    notify_new_visits: false,
+    notify_new_tests: false,
+    notify_own_visits_only: false,
+    notify_own_tests_only: false,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
+    const name = e.target.name;
+    
+    setFormData((prev) => {
+      const newData = { ...prev, [name]: value };
+      
+      // If role changed to doctor, automatically check the notification boxes
+      if (name === 'role' && value === 'doctor') {
+        newData.notify_new_visits = true;
+        newData.notify_new_tests = true;
+      }
+      
+      return newData;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,8 +71,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
 
     try {
       // 1. Create auth user using secondary client
-      const { data: authData, error: authError } = await adminSupabase.auth.signUp({
-        email: formData.email,
+      const signUpOptions: any = {
         password: formData.password,
         options: {
           data: {
@@ -60,7 +79,12 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
             role: formData.role,
           },
         },
-      });
+      };
+
+      if (formData.email) signUpOptions.email = formData.email;
+      if (formData.login_phone) signUpOptions.phone = `+88${formData.login_phone}`;
+
+      const { data: authData, error: authError } = await adminSupabase.auth.signUp(signUpOptions);
 
       if (authError) throw authError;
 
@@ -69,12 +93,24 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
 
       // Note: The `handle_new_user` trigger in the database will automatically create 
       // the profile record. We just need to wait a tiny bit or let it be.
-      // However, if it's a doctor, we MUST insert into doctors_info.
-      
-      if (formData.role === 'doctor') {
-        // give trigger a moment just in case
-        await new Promise(resolve => setTimeout(resolve, 500)); 
+      // Wait for trigger to create profile
+      await new Promise(resolve => setTimeout(resolve, 600)); 
 
+      // Update profile with notification settings
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          phone: formData.login_phone || null,
+          notify_new_visits: formData.notify_new_visits,
+          notify_new_tests: formData.notify_new_tests,
+          notify_own_visits_only: formData.notify_own_visits_only,
+          notify_own_tests_only: formData.notify_own_tests_only
+        })
+        .eq('id', newUserId);
+        
+      if (profileError) console.error("Could not update profile notifications", profileError);
+
+      if (formData.role === 'doctor') {
         const { error: doctorError } = await supabase
           .from('doctors_info')
           .insert({
@@ -84,6 +120,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
             current_job_title: formData.current_job_title,
             institution: formData.institution,
             phone_number: formData.phone_number,
+            bmdc_number: formData.bmdc_number || null,
           });
 
         if (doctorError) throw doctorError;
@@ -99,8 +136,8 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
 
   // Determine allowed roles to create based on current user's role
   const allowedRoles = profile?.role === 'super_admin' 
-    ? ['diag_manager', 'doctor', 'account_manager', 'receptionist']
-    : ['doctor', 'account_manager', 'receptionist'];
+    ? ['super_admin', 'diag_manager', 'doctor', 'account_manager', 'receptionist']
+    : ['diag_manager', 'doctor', 'account_manager', 'receptionist'];
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
@@ -120,14 +157,24 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
             onChange={handleChange} 
           />
           <Input 
-            label="Email Address" 
-            name="email" 
-            type="email" 
-            required 
-            value={formData.email} 
+            label="Login Phone (01...)" 
+            name="login_phone" 
+            required={!formData.email}
+            value={formData.login_phone} 
             onChange={handleChange} 
+            placeholder="e.g. 01XXXXXXXXX"
           />
         </div>
+
+        <Input 
+          label="Email Address (Optional if phone provided)" 
+          name="email" 
+          type="email" 
+          required={!formData.login_phone}
+          value={formData.email} 
+          onChange={handleChange} 
+          placeholder="admin@hospital.com"
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input 
@@ -138,6 +185,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
             value={formData.password} 
             onChange={handleChange} 
             minLength={6}
+            placeholder="••••••••"
           />
           
           <div className="w-full">
@@ -149,7 +197,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
               required
               value={formData.role}
               onChange={handleChange}
-              className="appearance-none block w-full px-3 py-2.5 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white/50 focus:bg-white"
+              className="appearance-none block w-full px-3 py-2.5 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white/50 focus:bg-white cursor-pointer"
             >
               {allowedRoles.map(role => (
                 <option key={role} value={role}>
@@ -159,6 +207,61 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
             </select>
           </div>
         </div>
+
+        {(profile?.role === 'super_admin' || profile?.role === 'diag_manager') && (
+          <div className="mt-4 p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">
+            <h4 className="text-sm font-semibold text-slate-800">Notification Preferences</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  name="notify_new_visits"
+                  checked={formData.notify_new_visits}
+                  onChange={handleChange}
+                  className="rounded text-primary-600 focus:ring-primary-500" 
+                />
+                Receive New Visit Alerts
+              </label>
+
+              {formData.role === 'doctor' && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer ml-4">
+                  <input 
+                    type="checkbox" 
+                    name="notify_own_visits_only"
+                    checked={formData.notify_own_visits_only}
+                    onChange={handleChange}
+                    className="rounded text-secondary-600 focus:ring-secondary-500" 
+                  />
+                  Own Patients Only
+                </label>
+              )}
+
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  name="notify_new_tests"
+                  checked={formData.notify_new_tests}
+                  onChange={handleChange}
+                  className="rounded text-primary-600 focus:ring-primary-500" 
+                />
+                Receive New Test Alerts
+              </label>
+
+              {formData.role === 'doctor' && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer ml-4">
+                  <input 
+                    type="checkbox" 
+                    name="notify_own_tests_only"
+                    checked={formData.notify_own_tests_only}
+                    onChange={handleChange}
+                    className="rounded text-secondary-600 focus:ring-secondary-500" 
+                  />
+                  Own Patients Only
+                </label>
+              )}
+            </div>
+          </div>
+        )}
 
         {formData.role === 'doctor' && (
           <div className="mt-6 pt-6 border-t border-slate-100 space-y-4 animate-fade-in-up">
@@ -202,20 +305,27 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
                 onChange={handleChange} 
               />
               <Input 
-                label="Phone Number (Optional)" 
-                name="phone_number" 
-                value={formData.phone_number} 
+                label="BMDC Number (Optional)" 
+                name="bmdc_number" 
+                value={formData.bmdc_number} 
                 onChange={handleChange} 
+                placeholder="e.g. A-12345"
               />
             </div>
+            <Input 
+              label="Phone Number (Optional)" 
+              name="phone_number" 
+              value={formData.phone_number} 
+              onChange={handleChange} 
+            />
           </div>
         )}
 
         <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-100">
-          <Button variant="ghost" type="button" onClick={onClose}>
+          <Button variant="ghost" type="button" onClick={onClose} className="cursor-pointer">
             Cancel
           </Button>
-          <Button type="submit" isLoading={loading}>
+          <Button type="submit" isLoading={loading} className="cursor-pointer">
             Create User
           </Button>
         </div>

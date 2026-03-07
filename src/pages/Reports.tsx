@@ -3,8 +3,10 @@ import { Download, FileText, Calendar as CalendarIcon, Filter } from 'lucide-rea
 import { supabase } from '../lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
+import { useNotification } from '../components/NotificationProvider';
 
 export default function Reports() {
+  const { warning } = useNotification();
   const [reportType, setReportType] = useState<'bills' | 'visits'>('bills');
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -48,7 +50,7 @@ export default function Reports() {
   };
 
   const handleDownloadCSV = () => {
-    if (data.length === 0) return alert('No data to export');
+    if (data.length === 0) return warning('No data', 'There is no data to export for this period.');
 
     let csvContent = "data:text/csv;charset=utf-8,";
     

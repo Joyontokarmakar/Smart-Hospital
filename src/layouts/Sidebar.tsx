@@ -12,9 +12,11 @@ import {
   X,
   Stethoscope,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useSettings } from '../hooks/useSettings';
 
 interface NavItem {
   name: string;
@@ -32,11 +34,13 @@ const navItems: NavItem[] = [
   { name: 'Appointments', path: '/appointments', icon: Calendar, roles: ['receptionist', 'doctor'] },
   { name: 'Reports', path: '/reports', icon: FileText, roles: ['super_admin', 'diag_manager', 'account_manager'] },
   { name: 'Logs', path: '/logs', icon: Clock, roles: ['super_admin', 'diag_manager'] },
-  { name: 'Settings', path: '/settings', icon: Settings, roles: ['super_admin'] },
+  { name: 'Notifications', path: '/notification-permissions', icon: ShieldCheck, roles: ['super_admin'] },
+  { name: 'Settings', path: '/settings', icon: Settings, roles: ['super_admin', 'diag_manager'] },
 ];
 
 export function Sidebar() {
   const { profile } = useAuth();
+  const { settings } = useSettings();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -52,7 +56,7 @@ export function Sidebar() {
       {/* Mobile Toggle Button */}
       <button 
         onClick={toggleMobileMenu}
-        className="lg:hidden fixed bottom-4 right-4 z-50 p-3 bg-primary-600 text-white rounded-full shadow-lg"
+        className="lg:hidden fixed bottom-4 right-4 z-50 p-3 bg-primary-600 text-white rounded-full shadow-lg cursor-pointer"
       >
         {mobileOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
@@ -67,7 +71,7 @@ export function Sidebar() {
 
       {/* Sidebar Content */}
       <aside 
-        className={`fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col shadow-xl lg:shadow-none
+        className={`fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col shadow-xl lg:shadow-none lg:relative lg:flex-shrink-0
           ${collapsed ? 'w-20' : 'w-64'} 
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
@@ -75,18 +79,22 @@ export function Sidebar() {
         {/* Logo Area */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
-              <Stethoscope size={24} />
+            <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+              {settings?.logo_url ? (
+                <img src={settings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <Stethoscope size={24} />
+              )}
             </div>
             {!collapsed && (
               <span className="font-bold text-slate-800 truncate select-none transition-opacity duration-300">
-                Smart Hospital
+                {settings?.name || 'Smart Hospital'}
               </span>
             )}
           </div>
           <button 
             onClick={toggleSidebar}
-            className="hidden lg:flex p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            className="hidden lg:flex p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
@@ -100,7 +108,7 @@ export function Sidebar() {
               to={item.path}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }: { isActive: boolean }) => `
-                flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative
+                flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative cursor-pointer
                 ${isActive 
                   ? 'bg-primary-50 text-primary-700 font-medium' 
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'

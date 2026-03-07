@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Edit2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
+import { useNotification } from '../components/NotificationProvider';
 import { TestModal } from '../components/TestModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 export default function Tests() {
+  const { error: showError } = useNotification();
   const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -13,6 +16,8 @@ export default function Tests() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testToEdit, setTestToEdit] = useState<any>(null);
+  const [testToDelete, setTestToDelete] = useState<{id: string, name: string} | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchTests();
@@ -44,6 +49,26 @@ export default function Tests() {
   const handleModalSuccess = () => {
     setIsModalOpen(false);
     fetchTests(); // Refresh list
+  };
+
+  const handleDeleteTest = (id: string, name: string) => {
+    setTestToDelete({ id, name });
+  };
+
+  const confirmDeleteTest = async () => {
+    if (!testToDelete) return;
+
+    setIsDeleting(true);
+    const { error } = await supabase.from('tests').delete().eq('id', testToDelete.id);
+    
+    if (error) {
+      showError('Delete Failed', `Error deleting test: ${error.message}`);
+    } else {
+      await fetchTests();
+    }
+    
+    setIsDeleting(false);
+    setTestToDelete(null);
   };
 
   const filteredTests = tests.filter(t => 
@@ -111,7 +136,7 @@ export default function Tests() {
                         <p className="font-medium text-slate-900">{test.name}</p>
                       </td>
                       <td className="px-6 py-4 border-b border-slate-100 text-right font-medium text-slate-700">
-                        ${test.price.toFixed(2)}
+                        ৳{test.price.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 border-b border-slate-100 text-center">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-50 text-secondary-700 border border-secondary-200">
@@ -119,12 +144,22 @@ export default function Tests() {
                         </span>
                       </td>
                       <td className="px-6 py-4 border-b border-slate-100 text-right">
-                        <button
-                          onClick={() => handleOpenEdit(test)}
-                          className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex justify-end items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEdit(test)}
+                            className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Test"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTest(test.id, test.name)}
+                            className="p-2 text-slate-400 hover:text-error-600 hover:bg-error-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Test"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -143,6 +178,18 @@ export default function Tests() {
           testToEdit={testToEdit}
         />
       )}
+
+      <ConfirmModal
+        isOpen={testToDelete !== null}
+        onClose={() => setTestToDelete(null)}
+        onConfirm={confirmDeleteTest}
+        title="Delete Diagnostic Test"
+        message={`Are you sure you want to delete the test "${testToDelete?.name}"?\n\nThis action cannot be undone. Past bills holding this test will remain unchanged.`}
+        confirmText="Delete Test"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

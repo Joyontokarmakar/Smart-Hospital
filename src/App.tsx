@@ -11,13 +11,17 @@ import Appointments from './pages/Appointments';
 import Reports from './pages/Reports';
 import { PrivateRoute } from './components/PrivateRoute';
 import { DashboardLayout } from './layouts/DashboardLayout';
+import { SettingsProvider } from './hooks/useSettings';
+import SettingsPage from './pages/Settings';
+import NotificationManagement from './pages/NotificationManagement';
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+      <SettingsProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
           
           <Route 
             path="/" 
@@ -85,13 +89,30 @@ function App() {
                 </PrivateRoute>
               } 
             />
+            <Route 
+              path="notification-permissions" 
+              element={
+                <PrivateRoute allowedRoles={['super_admin']}>
+                  <NotificationManagement />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="settings" 
+              element={
+                <PrivateRoute allowedRoles={['super_admin', 'diag_manager']}>
+                  <SettingsPage />
+                </PrivateRoute>
+              } 
+            />
           </Route>
           
           {/* Fallback route */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
-    </AuthProvider>
+    </SettingsProvider>
+  </AuthProvider>
   );
 }
 

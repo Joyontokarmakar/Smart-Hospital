@@ -19,6 +19,7 @@ export function PatientModal({ isOpen, onClose, onSuccess }: PatientModalProps) 
     phone: '',
     age: '',
     gender: 'Male',
+    blood_group: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -49,6 +50,7 @@ export function PatientModal({ isOpen, onClose, onSuccess }: PatientModalProps) 
           phone: formData.phone,
           age: formData.age ? parseInt(formData.age as string) : null,
           gender: formData.gender,
+          blood_group: formData.blood_group || null,
         })
         .select()
         .single();
@@ -113,6 +115,28 @@ export function PatientModal({ isOpen, onClose, onSuccess }: PatientModalProps) 
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div className="w-full">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Blood Group (Optional)
+            </label>
+            <select
+              name="blood_group"
+              value={formData.blood_group}
+              onChange={handleChange}
+              className="appearance-none block w-full px-3 py-2.5 border border-slate-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white/50 focus:bg-white"
+            >
+              <option value="">Select Blood Group</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
             </select>
           </div>
         </div>
