@@ -32,19 +32,18 @@ export default function Login() {
     try {
       let signInData: any = {};
       
-      if (identifier.includes('@')) {
-        signInData = { email: identifier, password };
-      } else {
-        // Phone validation: Must start with 01 and be exactly 11 digits
+      const isEmail = identifier.includes('@');
+      const identifierToUse = isEmail ? identifier : `${identifier}@hospital.local`;
+
+      if (!isEmail) {
+        // Phone validation: Must be exactly 11 digits starting with 01
         const phoneRegex = /^01\d{9}$/;
         if (!phoneRegex.test(identifier)) {
-          throw new Error('Please enter a valid email or an 11-digit phone number starting with 01 (e.g., 01521305180).');
+          throw new Error('Please enter a valid email or an 11-digit phone number starting with 01.');
         }
-        // Assuming Supabase expects the phone number with a country code, you might need to prepend it
-        // Example: signInData = { phone: '+88' + identifier, password };
-        // For now using the identifier directly
-        signInData = { phone: '+88' + identifier, password }; 
       }
+
+      signInData = { email: identifierToUse, password };
 
       const { error } = await supabase.auth.signInWithPassword(signInData);
 

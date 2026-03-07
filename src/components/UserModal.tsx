@@ -81,8 +81,14 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
         },
       };
 
-      if (formData.email) signUpOptions.email = formData.email;
-      if (formData.login_phone) signUpOptions.phone = `+88${formData.login_phone}`;
+      if (formData.email) {
+        signUpOptions.email = formData.email;
+      } else if (formData.login_phone) {
+        // Create a shadow email to bypass SMS requirements
+        signUpOptions.email = `${formData.login_phone}@hospital.local`;
+      } else {
+        throw new Error("Either Email or Phone is required.");
+      }
 
       const { data: authData, error: authError } = await adminSupabase.auth.signUp(signUpOptions);
 
