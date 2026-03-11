@@ -5,7 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Tests from './pages/Tests';
 import Logs from './pages/Logs';
-import Patients from './pages/Patients';
+import Booking from './pages/Booking';
+import AllPatients from './pages/AllPatients';
 import Billing from './pages/Billing';
 import Appointments from './pages/Appointments';
 import Reports from './pages/Reports';
@@ -14,6 +15,7 @@ import { DashboardLayout } from './layouts/DashboardLayout';
 import { SettingsProvider } from './hooks/useSettings';
 import SettingsPage from './pages/Settings';
 import NotificationManagement from './pages/NotificationManagement';
+import ActivityLog from './pages/ActivityLog';
 
 function App() {
   return (
@@ -58,10 +60,18 @@ function App() {
               } 
             />
             <Route 
-              path="patients" 
+              path="booking" 
               element={
                 <PrivateRoute allowedRoles={['receptionist', 'doctor']}>
-                  <Patients />
+                  <Booking />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="all-patients" 
+              element={
+                <PrivateRoute allowedRoles={['receptionist', 'doctor', 'super_admin', 'diag_manager']}>
+                  <AllPatients />
                 </PrivateRoute>
               } 
             />
@@ -86,6 +96,14 @@ function App() {
               element={
                 <PrivateRoute allowedRoles={['super_admin', 'diag_manager', 'account_manager']}>
                   <Reports />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="activity-log" 
+              element={
+                <PrivateRoute allowedRoles={['super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor']}>
+                  <ActivityLog />
                 </PrivateRoute>
               } 
             />

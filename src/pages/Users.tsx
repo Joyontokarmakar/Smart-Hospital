@@ -79,11 +79,7 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">User Management</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage hospital staff and their roles.</p>
-        </div>
+      <div className="flex justify-end">
         <Button 
           onClick={() => setIsModalOpen(true)}
           leftIcon={<Plus className="w-4 h-4" />}
@@ -130,24 +126,23 @@ export default function Users() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-semibold">User</th>
+                  <th className="px-6 py-4 font-semibold">User (ID)</th>
+                  <th className="px-6 py-4 font-semibold">Contact Info</th>
                   <th className="px-6 py-4 font-semibold">Role</th>
                   <th className="px-6 py-4 font-semibold">Alerts</th>
-                  <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Joined At</th>
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                       Loading users...
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                       No users found.
                     </td>
                   </tr>
@@ -161,8 +156,14 @@ export default function Users() {
                           </div>
                           <div>
                             <p className="font-medium text-slate-900">{user.full_name}</p>
-                            <p className="text-xs text-slate-500 truncate max-w-[200px]">{user.phone || user.id}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{user.id}</p>
                           </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 border-b border-slate-100">
+                        <div className="text-sm">
+                          <p className="text-slate-900 font-medium">{user.phone || 'No Phone'}</p>
+                          <p className="text-xs text-slate-500">{user.email || 'No Email'}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4 border-b border-slate-100">

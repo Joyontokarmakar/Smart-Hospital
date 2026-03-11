@@ -23,7 +23,9 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
+    email: '',
     role: '',
+    max_discount: 0,
     notify_new_visits: false,
     notify_new_tests: false,
     notify_own_visits_only: false,
@@ -83,7 +85,9 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
       setFormData({
         full_name: profileData.full_name || '',
         phone: profileData.phone || '',
+        email: profileData.email || '',
         role: profileData.role || '',
+        max_discount: profileData.max_discount || 0,
         notify_new_visits: profileData.notify_new_visits || false,
         notify_new_tests: profileData.notify_new_tests || false,
         notify_own_visits_only: profileData.notify_own_visits_only || false,
@@ -172,6 +176,8 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
         .update({
           full_name: formData.full_name,
           phone: formData.phone || null,
+          email: formData.email || null,
+          max_discount: formData.max_discount,
           notify_new_visits: formData.notify_new_visits,
           notify_new_tests: formData.notify_new_tests,
           notify_own_visits_only: formData.notify_own_visits_only,
@@ -236,6 +242,25 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
               value={formData.phone} 
               onChange={handleChange} 
               placeholder="e.g. 01XXXXXXXXX"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input 
+              label="Email Address" 
+              name="email" 
+              value={formData.email} 
+              onChange={handleChange} 
+              placeholder="user@hospital.com"
+            />
+            <Input 
+              label="Max Discount (%)" 
+              name="max_discount" 
+              type="number"
+              step="0.01"
+              value={formData.max_discount} 
+              onChange={handleChange} 
+              placeholder="0.00"
             />
           </div>
 

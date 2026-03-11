@@ -218,14 +218,8 @@ export default function Dashboard() {
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-secondary-50 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4 opacity-60"></div>
         
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
-            Welcome back, <span className="text-primary-600">{profile?.full_name}</span>
-          </h1>
-          <p className="text-slate-500 mt-2 text-lg">
-            Here's what's happening at the hospital today.
-          </p>
-          <div className="mt-6 flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-sm font-medium capitalize border border-slate-200">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-100 text-primary-700 text-sm font-semibold capitalize border border-primary-200">
               <Clock className="w-4 h-4" />
               {profile?.role.replace('_', ' ')} Access
             </span>
@@ -267,7 +261,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           
           {['super_admin', 'diag_manager', 'receptionist'].includes(profile?.role || '') && (
-            <Link to="/patients" className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:border-primary-200 hover:bg-primary-50 transition-colors group">
+            <Link to="/booking" className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:border-primary-200 hover:bg-primary-50 transition-colors group">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-primary-600 border border-slate-100 group-hover:border-primary-200">
                   <Users className="w-5 h-5" />

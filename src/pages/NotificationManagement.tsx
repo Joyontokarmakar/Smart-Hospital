@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Search, Filter, Loader2, Bell, CheckCircle2 } from 'lucide-react';
+import { Search, Filter, Loader2, Bell, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
@@ -63,17 +63,6 @@ export default function NotificationManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
-            <ShieldCheck className="w-6 h-6 text-primary-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Notification Permissions</h1>
-            <p className="text-slate-500 text-sm mt-1">Manage what alerts each staff member receives.</p>
-          </div>
-        </div>
-      </div>
 
       <Card>
         <CardHeader>

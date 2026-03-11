@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Bell, Search, LogOut, Check, CheckCircle2, AlertCircle, FileText, User, Activity } from 'lucide-react';
+import { Bell, LogOut, Check, CheckCircle2, AlertCircle, FileText, User, Activity, LayoutDashboard, Users, ClipboardList, Settings, Calendar, ShieldCheck, Clock, TrendingUp } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
@@ -7,9 +8,77 @@ import { supabase } from '../lib/supabase';
 import type { Notification } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 
+const routeConfig: Record<string, { title: string; subtitle: string; icon: any }> = {
+  '/dashboard': { 
+    title: 'Dashboard', 
+    subtitle: 'Overview of hospital operations and performance.',
+    icon: LayoutDashboard
+  },
+  '/users': { 
+    title: 'Staff Directory', 
+    subtitle: 'Manage hospital staff accounts and access levels.',
+    icon: Users
+  },
+  '/tests': { 
+    title: 'Diagnostic Tests', 
+    subtitle: 'Configuration of medical tests and pricing structure.',
+    icon: Activity
+  },
+  '/booking': { 
+    title: 'Booking', 
+    subtitle: 'Register patients and assign doctors.',
+    icon: Calendar
+  },
+  '/all-patients': {
+    title: 'Patient Registry',
+    subtitle: 'Central database for all patient records.',
+    icon: Users
+  },
+  '/billing': { 
+    title: 'Financial Records', 
+    subtitle: 'Track invoices, payments, and outstanding dues.',
+    icon: FileText
+  },
+  '/appointments': { 
+    title: 'Appointments', 
+    subtitle: 'Manage patient doctor consultations and timing.',
+    icon: Calendar
+  },
+  '/reports': { 
+    title: 'Reports', 
+    subtitle: 'Detailed performance reports and data insights.',
+    icon: TrendingUp
+  },
+  '/logs': { 
+    title: 'Logs', 
+    subtitle: 'Chronological record of system activities and changes.',
+    icon: Clock
+  },
+  '/notification-permissions': { 
+    title: 'Notification Permission Settings', 
+    subtitle: 'Manage notification preferences for staff members.',
+    icon: ShieldCheck
+  },
+  '/settings': { 
+    title: 'Hospital Settings', 
+    subtitle: 'Global system settings and hospital information.',
+    icon: Settings
+  },
+  '/activity-log': { 
+    title: 'Activity Log', 
+    subtitle: 'Real-time feed of today\'s hospital activities.',
+    icon: ClipboardList
+  }
+};
+
 export function Header() {
   const { profile, signOut } = useAuth();
   const { settings } = useSettings();
+  const location = useLocation();
+  
+  // Find current route config
+  const currentRoute = Object.keys(routeConfig).find(path => location.pathname.startsWith(path)) || '/dashboard';
+  const { title, subtitle, icon: Icon } = routeConfig[currentRoute] || routeConfig['/dashboard'];
   
   // Notification State
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -110,9 +179,9 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-20">
+    <header className="h-20 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-20">
       
-      {/* Mobile Logo Logo Area */}
+      {/* Mobile Logo Area */}
       <div className="flex md:hidden items-center gap-2">
         <div className="w-8 h-8 bg-primary-50 flex items-center justify-center rounded-lg overflow-hidden">
           {settings?.logo_url ? (
@@ -123,17 +192,14 @@ export function Header() {
         </div>
       </div>
       
-      {/* Search Bar Placeholder */}
-      <div className="flex-1 max-w-md hidden md:flex">
-        <div className="relative w-full">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-slate-400" />
-          </div>
-          <input
-            type="text"
-            className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-full leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent sm:text-sm transition-colors duration-200"
-            placeholder="Search..."
-          />
+      {/* Dynamic Page Header */}
+      <div className="flex-1 hidden md:flex items-center gap-4 animate-fade-in-up">
+        <div className="w-12 h-12 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-600 shadow-sm border border-primary-100">
+          <Icon className="w-6 h-6" />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold text-slate-600 tracking-tight leading-none">{title}</h1>
+          <p className="text-slate-500 text-xs mt-2 font-medium">{subtitle}</p>
         </div>
       </div>
 

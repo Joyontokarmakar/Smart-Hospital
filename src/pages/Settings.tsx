@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, Save, Loader2, Hospital, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Save, Loader2, Hospital, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../hooks/useSettings';
 import { useAuth } from '../hooks/useAuth';
@@ -131,15 +131,6 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
-          <Settings className="w-6 h-6 text-slate-700" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Hospital Configuration</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage global details appearing on invoices and dashboards</p>
-        </div>
-      </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8">

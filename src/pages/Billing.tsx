@@ -45,7 +45,7 @@ export default function Billing() {
     setLoading(true);
     const { data } = await supabase
       .from('bills')
-      .select('*, patients(name, phone)')
+      .select('*, patients(name, phone), profiles!receptionist_id(full_name)')
       .order('created_at', { ascending: false });
     if (data) setBills(data);
     setLoading(false);
@@ -154,7 +154,7 @@ export default function Billing() {
       <div className="space-y-6 print:m-0 print:space-y-0">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/patients')} className="p-2 hover:bg-slate-200 rounded-full transition">
+            <button onClick={() => navigate('/booking')} className="p-2 hover:bg-slate-200 rounded-full transition">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -378,12 +378,8 @@ export default function Billing() {
   // Render "Recent Bills" View
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Billing Management</h1>
-          <p className="text-slate-500 text-sm mt-1">View recent diagnostic bills.</p>
-        </div>
-        <Button onClick={() => navigate('/patients')} leftIcon={<Plus className="w-4 h-4" />}>
+      <div className="flex justify-end">
+        <Button onClick={() => navigate('/booking')} leftIcon={<Plus className="w-4 h-4" />}>
           New Bill
         </Button>
       </div>
@@ -396,12 +392,15 @@ export default function Billing() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-semibold">Date</th>
-                  <th className="px-6 py-4 font-semibold">Patient Name</th>
-                  <th className="px-6 py-4 font-semibold text-right">Total Amount</th>
-                  <th className="px-6 py-4 font-semibold text-right">Due</th>
-                  <th className="px-6 py-4 font-semibold text-center">Status</th>
+                <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Patient</th>
+                  <th className="px-6 py-4 text-right">Subtotal</th>
+                  <th className="px-6 py-4 text-right">Discount</th>
+                  <th className="px-6 py-4 text-right">Total</th>
+                  <th className="px-6 py-4 text-right">Paid</th>
+                  <th className="px-6 py-4 text-right">Due</th>
+                  <th className="px-6 py-4 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -415,20 +414,42 @@ export default function Billing() {
                   </tr>
                 ) : (
                   bills.map(bill => (
-                    <tr key={bill.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4 text-sm text-slate-600">{new Date(bill.created_at).toLocaleString()}</td>
-                      <td className="px-6 py-4 font-medium text-slate-900">{bill.patients?.name || 'Unknown'}</td>
-                      <td className="px-6 py-4 text-right font-medium text-slate-700">৳{bill.total_amount.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-right font-medium text-error-600">
-                        {bill.amount_due > 0 ? `৳${bill.amount_due.toFixed(2)}` : '-'}
+                    <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0">
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-bold text-slate-700">{new Date(bill.created_at).toLocaleDateString()}</span>
+                        <p className="text-[10px] text-slate-400 font-medium">{new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       </td>
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-black text-slate-900">{bill.patients?.name || 'Unknown'}</span>
+                        <p className="text-[10px] text-slate-400">{bill.patients?.phone}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-xs font-bold text-slate-600">৳{bill.subtotal.toFixed(2)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                         <span className="text-xs font-bold text-secondary-600">৳{bill.total_discount.toFixed(2)}</span>
+                         <div className="flex items-center justify-end gap-1 mt-0.5">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">By:</span>
+                            <span className="text-[9px] font-black text-slate-500">{bill.profiles?.full_name?.split(' ')[0] || 'System'}</span>
+                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm font-black text-slate-900">৳{bill.total_amount.toFixed(2)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-black text-success-600 text-sm">৳{bill.amount_paid.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right">
+                        <span className={`text-sm font-black ${bill.amount_due > 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                          ৳{bill.amount_due > 0 ? bill.amount_due.toFixed(2) : '0.00'}
+                        </span>
+                      </td>
+                      
                       <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter border
                           ${bill.status === 'paid' ? 'bg-success-50 text-success-700 border-success-200' : ''}
                           ${bill.status === 'pending' ? 'bg-warning-50 text-warning-700 border-warning-200' : ''}
                           ${bill.status === 'cancelled' ? 'bg-error-50 text-error-700 border-error-200' : ''}
                         `}>
-                          <span className="capitalize">{bill.status}</span>
+                          {bill.status}
                         </span>
                       </td>
                     </tr>

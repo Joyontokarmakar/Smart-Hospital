@@ -71,11 +71,7 @@ export default function Logs() {
 
   return (
     <div className="space-y-6 print:space-y-0 print:m-0">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Receptionist Logs</h1>
-          <p className="text-slate-500 text-sm mt-1">View login and logout timings.</p>
-        </div>
+      <div className="flex justify-end print:hidden">
         <Button 
           onClick={handlePrint}
           leftIcon={<Printer className="w-4 h-4" />}

@@ -107,6 +107,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
         .from('profiles')
         .update({
           phone: formData.login_phone || null,
+          email: formData.email || null,
           notify_new_visits: formData.notify_new_visits,
           notify_new_tests: formData.notify_new_tests,
           notify_own_visits_only: formData.notify_own_visits_only,

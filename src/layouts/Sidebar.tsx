@@ -13,7 +13,8 @@ import {
   Stethoscope,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
@@ -29,10 +30,12 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, roles: ['super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor'] },
   { name: 'Users', path: '/users', icon: Users, roles: ['super_admin', 'diag_manager'] },
   { name: 'Tests', path: '/tests', icon: Activity, roles: ['super_admin', 'diag_manager'] },
-  { name: 'Patients', path: '/patients', icon: Users, roles: ['receptionist', 'doctor'] },
+  { name: 'Booking', path: '/booking', icon: Calendar, roles: ['receptionist', 'doctor'] },
+  { name: 'All Patients', path: '/all-patients', icon: Users, roles: ['receptionist', 'doctor', 'super_admin', 'diag_manager'] },
   { name: 'Billing', path: '/billing', icon: FileText, roles: ['receptionist'] },
   { name: 'Appointments', path: '/appointments', icon: Calendar, roles: ['receptionist', 'doctor'] },
   { name: 'Reports', path: '/reports', icon: FileText, roles: ['super_admin', 'diag_manager', 'account_manager'] },
+  { name: 'Activity Log', path: '/activity-log', icon: ClipboardList, roles: ['super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor'] },
   { name: 'Logs', path: '/logs', icon: Clock, roles: ['super_admin', 'diag_manager'] },
   { name: 'Notifications', path: '/notification-permissions', icon: ShieldCheck, roles: ['super_admin'] },
   { name: 'Settings', path: '/settings', icon: Settings, roles: ['super_admin', 'diag_manager'] },
@@ -77,9 +80,9 @@ export function Sidebar() {
         `}
       >
         {/* Logo Area */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
+        <div className={`h-16 flex items-center border-b border-slate-100 shrink-0 relative transition-all duration-300 ${collapsed ? 'justify-center px-0' : 'justify-between px-4'}`}>
+          <div className={`flex items-center gap-3 overflow-hidden transition-all duration-300 ${collapsed ? 'justify-center' : ''}`}>
+            <div className="w-10 h-10 bg-primary-50 text-primary-600 rounded-xl flex items-center justify-center shrink-0 overflow-hidden shadow-sm border border-primary-100">
               {settings?.logo_url ? (
                 <img src={settings.logo_url} alt="Logo" className="w-full h-full object-contain" />
               ) : (
@@ -92,25 +95,29 @@ export function Sidebar() {
               </span>
             )}
           </div>
+          
           <button 
             onClick={toggleSidebar}
-            className="hidden lg:flex p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            className={`hidden lg:flex p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all cursor-pointer border border-transparent hover:border-primary-100
+              ${collapsed ? 'absolute -right-3 top-1/2 -translate-y-1/2 bg-white shadow-md z-50' : ''}
+            `}
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={16} />}
           </button>
         </div>
 
         {/* Navigation Links */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1 custom-scrollbar">
           {allowedItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }: { isActive: boolean }) => `
-                flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative cursor-pointer
+                flex items-center rounded-xl transition-all duration-300 group relative cursor-pointer
+                ${collapsed ? 'justify-center p-3 mx-2' : 'gap-3 px-3 py-3 mx-0'}
                 ${isActive 
-                  ? 'bg-primary-50 text-primary-700 font-medium' 
+                  ? 'bg-primary-50 text-primary-700 font-medium shadow-sm' 
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }
               `}

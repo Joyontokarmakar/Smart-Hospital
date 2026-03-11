@@ -3,9 +3,11 @@ export type UserRole = 'super_admin' | 'diag_manager' | 'receptionist' | 'accoun
 export interface Profile {
   id: string;
   full_name: string;
+  email?: string;
   phone?: string;
   role: UserRole;
   status: 'active' | 'inactive';
+  max_discount?: number;
   notify_new_visits?: boolean;
   notify_new_tests?: boolean;
   notify_own_visits_only?: boolean;
