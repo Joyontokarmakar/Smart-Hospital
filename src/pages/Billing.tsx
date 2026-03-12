@@ -76,7 +76,7 @@ export default function Billing() {
     setLoading(true);
     const { data } = await supabase
       .from('bills')
-      .select('*, patients(name, phone), profiles!receptionist_id(full_name), bill_items(expected_delivery)')
+      .select('*, patients(name, phone), profiles!receptionist_id(full_name)')
       .order('created_at', { ascending: false });
     if (data) setBills(data);
     setLoading(false);
@@ -157,6 +157,7 @@ export default function Billing() {
           total_amount: totalAmount,
           amount_paid: parsedAmountPaid,
           amount_due: amountDue,
+          estimate_delivery_date: estimateDeliveryDate ? new Date(estimateDeliveryDate).toISOString() : null,
           status: amountDue > 0 ? 'pending' : 'paid'
         })
         .select()
@@ -425,12 +426,12 @@ export default function Billing() {
                   </tr>
                 ) : bills.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">No bills found.</td>
+                    <td colSpan={9} className="px-6 py-12 text-center text-slate-500">No bills found.</td>
                   </tr>
                 ) : (
                   bills.map(bill => {
-                    const estimateDeliveryDate = bill.bill_items && bill.bill_items.length > 0 && bill.bill_items[0].expected_delivery
-                      ? new Date(bill.bill_items[0].expected_delivery).toLocaleDateString()
+                    const estimateDeliveryDateDisplay = bill.estimate_delivery_date
+                      ? new Date(bill.estimate_delivery_date).toLocaleDateString()
                       : null;
                     
                     return (
@@ -438,10 +439,10 @@ export default function Billing() {
                       <td className="px-6 py-4">
                         <span className="text-xs font-bold text-slate-700">{new Date(bill.created_at).toLocaleDateString()}</span>
                         <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                        {estimateDeliveryDate && (
+                        {estimateDeliveryDateDisplay && (
                           <div className="mt-1 pt-1 border-t border-slate-100">
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Est. Delivery</p>
-                            <span className="text-[10px] font-medium text-slate-600 whitespace-nowrap">{estimateDeliveryDate}</span>
+                            <span className="text-[10px] font-medium text-slate-600 whitespace-nowrap">{estimateDeliveryDateDisplay}</span>
                           </div>
                         )}
                       </td>

@@ -177,7 +177,7 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
           full_name: formData.full_name,
           phone: formData.phone || null,
           email: formData.email || null,
-          max_discount: formData.max_discount,
+          max_discount: parseFloat(formData.max_discount.toString()) || 0,
           notify_new_visits: formData.notify_new_visits,
           notify_new_tests: formData.notify_new_tests,
           notify_own_visits_only: formData.notify_own_visits_only,

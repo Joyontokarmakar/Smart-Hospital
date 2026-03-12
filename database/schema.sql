@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS bills (
   total_amount DECIMAL(10, 2) NOT NULL,
   amount_paid DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
   amount_due DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+  estimate_delivery_date TIMESTAMPTZ,
   status TEXT DEFAULT 'paid' CHECK (status IN ('paid', 'pending', 'cancelled')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -264,12 +265,7 @@ CREATE POLICY "Allow authenticated update" ON visits FOR UPDATE USING (auth.role
 -- RLS Policies for Bills
 CREATE POLICY "Allow selective bill access" ON bills FOR SELECT USING (
   auth.role() = 'authenticated' AND (
-    public.get_my_role() = 'super_admin' OR
-    (public.get_my_role() = 'diag_manager' AND EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.id = bills.receptionist_id AND profiles.role != 'super_admin'
-    )) OR
-    (public.get_my_role() NOT IN ('super_admin', 'diag_manager') AND bills.receptionist_id = auth.uid())
+    public.get_my_role() IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager')
   )
 );
 
