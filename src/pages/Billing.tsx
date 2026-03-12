@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Plus, Printer, ArrowLeft } from 'lucide-react';
+import { Plus, Printer, ArrowLeft, Eye, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
 import { Button } from '../components/Button';
 import { useNotification } from '../components/NotificationProvider';
+import { Receipt } from '../components/Receipt';
 
 export default function Billing() {
   const { profile } = useAuth();
@@ -22,14 +23,43 @@ export default function Billing() {
   const [bills, setBills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [amountPaid, setAmountPaid] = useState<string>('');
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [lastCreatedBill, setLastCreatedBill] = useState<any>(null);
 
   useEffect(() => {
-    if (patientId) {
+    const billId = searchParams.get('billId');
+    if (billId) {
+      fetchBillDetails(billId);
+    } else if (patientId) {
       fetchPatientAndTests(patientId);
     } else {
       fetchBills();
     }
-  }, [patientId]);
+  }, [patientId, searchParams]);
+
+  const fetchBillDetails = async (id: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('bills')
+        .select('*, patients(*), bill_items(*)')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setLastCreatedBill(data);
+        setShowReceipt(true);
+        if (searchParams.get('print') === 'true') {
+          setTimeout(() => window.print(), 1000);
+        }
+      }
+    } catch (err: any) {
+      showError('Error fetching bill', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchPatientAndTests = async (id: string) => {
     setLoading(true);
@@ -49,6 +79,27 @@ export default function Billing() {
       .order('created_at', { ascending: false });
     if (data) setBills(data);
     setLoading(false);
+  };
+
+  const handleUpdateStatus = async (bill: any, newStatus: string) => {
+    try {
+      const updates: any = { status: newStatus };
+      if (newStatus === 'paid') {
+        updates.amount_paid = bill.total_amount;
+        updates.amount_due = 0;
+      }
+
+      const { error } = await supabase
+        .from('bills')
+        .update(updates)
+        .eq('id', bill.id);
+
+      if (error) throw error;
+      success('Success', `Bill status updated to ${newStatus}`);
+      fetchBills();
+    } catch (err: any) {
+      showError('Update Failed', err.message);
+    }
   };
 
   const handleAddTest = (testId: string) => {
@@ -81,7 +132,7 @@ export default function Billing() {
     setSelectedTests(selectedTests.map(t => {
       if (t.id === testId) {
         // Enforce max discount
-        const maxAllowedStr = (t.price * (t.discount_percentage / 100)).toFixed(2);
+        const maxAllowedStr = (t.price * ((profile?.max_discount || 0) / 100)).toFixed(2);
         const maxAllowed = parseFloat(maxAllowedStr);
         let validAmount = amount;
         if (amount > maxAllowed) validAmount = maxAllowed;
@@ -136,10 +187,14 @@ export default function Billing() {
       const { error: itemsError } = await supabase.from('bill_items').insert(billItems);
       if (itemsError) throw itemsError;
 
-      success('Bill created!', 'Proceeding to print preview.');
-      // Keep it on this view but ready to print if we want, or just trigger window.print directly
-      // Realistically we would navigate to a bill details page, but let's just trigger print
-      setTimeout(() => window.print(), 500);
+      success('Bill created!', 'Proceeding to receipt preview.');
+      setLastCreatedBill({
+        ...bill,
+        items: billItems,
+        patient,
+        settings
+      });
+      setShowReceipt(true);
 
     } catch (err: any) {
       showError('Error creating bill', err.message || 'An unexpected error occurred.');
@@ -148,11 +203,33 @@ export default function Billing() {
     }
   };
 
+  // Render Receipt View
+  if (showReceipt && lastCreatedBill) {
+    return (
+      <Receipt 
+        bill={lastCreatedBill} 
+        settings={settings}
+        onBack={() => {
+          setShowReceipt(false);
+          setLastCreatedBill(null);
+          navigate('/billing');
+        }}
+        onNew={() => {
+          setShowReceipt(false);
+          setLastCreatedBill(null);
+          setSelectedTests([]);
+          setAmountPaid('');
+          navigate('/billing');
+        }}
+      />
+    );
+  }
+
   // Render "Create Bill" View
   if (patientId) {
     return (
-      <div className="space-y-6 print:m-0 print:space-y-0">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
             <button onClick={() => navigate('/booking')} className="p-2 hover:bg-slate-200 rounded-full transition">
               <ArrowLeft className="w-5 h-5" />
@@ -167,12 +244,12 @@ export default function Billing() {
             leftIcon={<Printer className="w-4 h-4" />}
             disabled={selectedTests.length === 0 || loading}
           >
-            Generate & Print
+            Generate & Preview
           </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6 print:hidden">
+          <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Add Tests</CardTitle>
@@ -215,7 +292,7 @@ export default function Billing() {
                       </thead>
                     <tbody className="divide-y divide-slate-100">
                       {selectedTests.map(t => {
-                        const maxDiscAmt = t.price * (t.discount_percentage / 100);
+                        const maxDiscAmt = t.price * ((profile?.max_discount || 0) / 100);
                         return (
                           <tr key={t.id}>
                             <td className="px-6 py-4 text-sm font-medium text-slate-900">{t.name}</td>
@@ -259,97 +336,54 @@ export default function Billing() {
           </div>
 
           <div className="lg:col-span-1">
-            {/* Summary Card - Also acts as print view */}
-            <Card className="print:shadow-none print:border-none print:w-full">
-              <CardHeader className="print:hidden">
+            {/* Summary Card */}
+            <Card>
+              <CardHeader>
                 <CardTitle>Bill Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="hidden print:block mb-8 text-center pt-8 border-b border-black pb-4">
-                    {settings?.logo_url ? (
-                      <div className="flex justify-center mb-4">
-                        <img src={settings.logo_url} alt="Hospital Logo" className="h-20 object-contain" />
-                      </div>
-                    ) : (
-                      <h2 className="text-2xl font-bold uppercase">{settings?.name || 'Smart Hospital'}</h2>
-                    )}
-                    <p className="text-sm mt-1">{settings?.address || '123 Health Ave'}</p>
-                    <p className="text-xs text-slate-600 mt-1 pb-2">{settings?.contact_info || 'Contact Info'}</p>
-                    <p className="text-sm font-semibold mt-2 inline-block border border-black px-4 py-1 rounded">Diagnostic Cash Receipt</p>
-                  </div>
-
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider print:text-black">Patient Info</h3>
-                    <p className="font-bold text-slate-900 mt-1 print:text-xl print:mt-2">{patient?.name}</p>
-                    <p className="text-slate-600 print:text-black">Phone: {patient?.phone}</p>
-                    {patient?.age && <p className="text-slate-600 print:text-black">Age/Gender: {patient?.age}y, {patient?.gender}</p>}
-                    <p className="text-slate-600 print:text-black mt-2 text-sm">Date: {new Date().toLocaleDateString()}</p>
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Patient Info</h3>
+                    <p className="font-bold text-slate-900 mt-1">{patient?.name}</p>
+                    <p className="text-slate-600">Phone: {patient?.phone}</p>
+                    {patient?.age && <p className="text-slate-600">Age/Gender: {patient?.age}y, {patient?.gender}</p>}
+                    <p className="text-slate-600 mt-2 text-sm">Date: {new Date().toLocaleDateString()}</p>
                   </div>
 
-                  <div className="hidden print:block mt-6">
-                    <table className="w-full text-sm border-collapse">
-                      <thead>
-                        <tr className="border-b border-black">
-                          <th className="text-left py-2">Service</th>
-                          <th className="text-right py-2">Price</th>
-                          <th className="text-right py-2">Disc.</th>
-                          <th className="text-right py-2">Net</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedTests.map(t => (
-                          <tr key={t.id} className="border-b border-slate-200">
-                            <td className="py-2">{t.name}</td>
-                            <td className="text-right py-2">৳{t.price.toFixed(2)}</td>
-                            <td className="text-right py-2">৳{t.appliedDiscount.toFixed(2)}</td>
-                            <td className="text-right py-2 font-bold">৳{(t.price - t.appliedDiscount).toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="border-t border-slate-200 pt-4 mt-6 print:border-black print:border-t-2">
+                  <div className="border-t border-slate-200 pt-4 mt-6">
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-600 print:text-black">Subtotal</span>
-                      <span className="font-medium text-slate-900 print:text-black">৳{subtotal.toFixed(2)}</span>
+                      <span className="text-slate-600">Subtotal</span>
+                      <span className="font-medium text-slate-900">৳{subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-sm mb-2 text-success-600 print:text-black">
+                    <div className="flex justify-between text-sm mb-2 text-success-600">
                       <span>Total Discount</span>
                       <span>- ৳{totalDiscount.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-lg font-bold text-slate-900 mt-4 pt-4 border-t border-slate-200 print:border-black print:text-xl">
+                    <div className="flex justify-between text-lg font-bold text-slate-900 mt-4 pt-4 border-t border-slate-200">
                       <span>Total Amount</span>
                       <span>৳{totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
                   
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 print:border-none print:p-0 mt-4">
-                    <div className="flex items-center justify-between mb-3 print:mb-2">
-                      <label className="text-sm font-medium text-slate-700 print:text-black">Advance / Amount Paid</label>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-slate-700">Advance / Amount Paid</label>
                       <input 
                         type="number"
                         min="0"
                         step="0.01"
-                        className="w-32 text-right border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 print:border-none print:p-0 print:font-bold"
+                        className="w-32 text-right border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                         value={amountPaid}
                         onChange={(e) => setAmountPaid(e.target.value)}
                         placeholder="0.00"
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700 print:text-black">Due Amount</span>
-                      <span className={`font-bold ${amountDue > 0 ? 'text-error-600' : 'text-success-600'} print:text-black`}>
+                      <span className="text-sm font-medium text-slate-700">Due Amount</span>
+                      <span className={`font-bold ${amountDue > 0 ? 'text-error-600' : 'text-success-600'}`}>
                         ৳{amountDue > 0 ? amountDue.toFixed(2) : '0.00'}
                       </span>
-                    </div>
-                  </div>
-
-                  <div className="hidden print:block mt-24">
-                    <div className="flex justify-between text-sm">
-                      <div className="border-t border-black pt-2 px-4">Patient Signature</div>
-                      <div className="border-t border-black pt-2 px-4">Authorized Signature</div>
                     </div>
                   </div>
                 </div>
@@ -357,20 +391,6 @@ export default function Billing() {
             </Card>
           </div>
         </div>
-
-        {/* Print Styles */}
-        <style>{`
-          @media print {
-            body { visibility: hidden; }
-            .min-h-screen { min-height: 0 !important; background: white !important; }
-            aside, header { display: none !important; }
-            main { margin-left: 0 !important; padding: 0 !important; }
-            .print\\:block { display: block !important; visibility: visible; }
-            .print\\:hidden { display: none !important; }
-            .lg\\:col-span-1 { grid-column: span 3 / span 3 !important; }
-            .w-full > .space-y-6 { visibility: visible; position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
-          }
-        `}</style>
       </div>
     );
   }
@@ -400,9 +420,10 @@ export default function Billing() {
                   <th className="px-6 py-4 text-right">Total</th>
                   <th className="px-6 py-4 text-right">Paid</th>
                   <th className="px-6 py-4 text-right">Due</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                </tr>
-              </thead>
+                   <th className="px-6 py-4 text-center">Status</th>
+                   <th className="px-6 py-4 text-right">Actions</th>
+                 </tr>
+               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
@@ -443,7 +464,7 @@ export default function Billing() {
                         </span>
                       </td>
                       
-                      <td className="px-6 py-4 text-center">
+                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter border
                           ${bill.status === 'paid' ? 'bg-success-50 text-success-700 border-success-200' : ''}
                           ${bill.status === 'pending' ? 'bg-warning-50 text-warning-700 border-warning-200' : ''}
@@ -451,6 +472,26 @@ export default function Billing() {
                         `}>
                           {bill.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => fetchBillDetails(bill.id)}
+                            className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                            title="View Receipt"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {bill.status === 'pending' && (
+                            <button
+                              onClick={() => handleUpdateStatus(bill, 'paid')}
+                              className="p-1.5 text-slate-400 hover:text-success-600 hover:bg-success-50 rounded-lg transition-colors"
+                              title="Mark as Paid"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))

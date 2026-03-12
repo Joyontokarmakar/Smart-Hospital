@@ -108,20 +108,19 @@ export default function Tests() {
                 <tr className="bg-slate-50 border-b border-slate-100 text-slate-600 text-xs uppercase tracking-wider">
                   <th className="px-6 py-4 font-semibold">Test Name</th>
                   <th className="px-6 py-4 font-semibold text-right">Price</th>
-                  <th className="px-6 py-4 font-semibold text-center">Max Discount</th>
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
                       Loading tests...
                     </td>
                   </tr>
                 ) : filteredTests.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
                       No tests found matching your search.
                     </td>
                   </tr>
@@ -133,11 +132,6 @@ export default function Tests() {
                       </td>
                       <td className="px-6 py-4 border-b border-slate-100 text-right font-medium text-slate-700">
                         ৳{test.price.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 border-b border-slate-100 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-50 text-secondary-700 border border-secondary-200">
-                          {test.discount_percentage}%
-                        </span>
                       </td>
                       <td className="px-6 py-4 border-b border-slate-100 text-right">
                         <div className="flex justify-end items-center gap-1">

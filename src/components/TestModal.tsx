@@ -18,7 +18,6 @@ export function TestModal({ isOpen, onClose, onSuccess, testToEdit }: TestModalP
   const [formData, setFormData] = useState({
     name: testToEdit?.name || '',
     price: testToEdit?.price || '',
-    discount_percentage: testToEdit?.discount_percentage || 0,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,7 +37,6 @@ export function TestModal({ isOpen, onClose, onSuccess, testToEdit }: TestModalP
           .update({
             name: formData.name,
             price: parseFloat(formData.price as string),
-            discount_percentage: parseFloat(formData.discount_percentage as string),
             updated_at: new Date().toISOString(),
           })
           .eq('id', testToEdit.id);
@@ -51,7 +49,6 @@ export function TestModal({ isOpen, onClose, onSuccess, testToEdit }: TestModalP
           .insert({
             name: formData.name,
             price: parseFloat(formData.price as string),
-            discount_percentage: parseFloat(formData.discount_percentage as string) || 0,
           });
 
         if (insertError) throw insertError;
@@ -82,7 +79,7 @@ export function TestModal({ isOpen, onClose, onSuccess, testToEdit }: TestModalP
           placeholder="e.g. Complete Blood Count (CBC)"
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <Input 
             label="Price (৳/USD)" 
             name="price" 
@@ -93,17 +90,6 @@ export function TestModal({ isOpen, onClose, onSuccess, testToEdit }: TestModalP
             value={formData.price} 
             onChange={handleChange} 
             placeholder="0.00"
-          />
-          <Input 
-            label="Maximum Discount (%)" 
-            name="discount_percentage" 
-            type="number"
-            step="0.1"
-            min="0"
-            max="100"
-            value={formData.discount_percentage} 
-            onChange={handleChange} 
-            placeholder="0"
           />
         </div>
 

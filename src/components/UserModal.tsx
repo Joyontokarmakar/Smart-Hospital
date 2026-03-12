@@ -33,6 +33,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
     login_phone: '',
     password: '',
     role: 'receptionist' as UserRole,
+    max_discount: 0,
     // Doctor specific fields
     degrees: '',
     specialization: '',
@@ -108,6 +109,7 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
         .update({
           phone: formData.login_phone || null,
           email: formData.email || null,
+          max_discount: formData.role === 'receptionist' ? formData.max_discount : 0,
           notify_new_visits: formData.notify_new_visits,
           notify_new_tests: formData.notify_new_tests,
           notify_own_visits_only: formData.notify_own_visits_only,
@@ -214,6 +216,20 @@ export function UserModal({ isOpen, onClose, onSuccess, title }: UserModalProps)
             </select>
           </div>
         </div>
+
+        {formData.role === 'receptionist' && (
+          <Input 
+            label="Maximum Discount Allowed (%)" 
+            name="max_discount" 
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={formData.max_discount} 
+            onChange={handleChange} 
+            placeholder="0.00"
+          />
+        )}
 
         {(profile?.role === 'super_admin' || profile?.role === 'diag_manager') && (
           <div className="mt-4 p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">

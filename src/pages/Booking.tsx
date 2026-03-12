@@ -280,6 +280,7 @@ export default function Booking() {
       setDiscount(0);
       setPaidAmount(0);
       success('Success', 'Test Bill Generated Successfully!');
+      navigate(`/billing?billId=${bill.id}&print=true`);
       fetchInitialData();
     } catch (err: any) {
       showError('Error', err.message || 'Error generating bill');

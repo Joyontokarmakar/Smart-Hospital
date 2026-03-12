@@ -253,15 +253,19 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
               onChange={handleChange} 
               placeholder="user@hospital.com"
             />
-            <Input 
-              label="Max Discount (%)" 
-              name="max_discount" 
-              type="number"
-              step="0.01"
-              value={formData.max_discount} 
-              onChange={handleChange} 
-              placeholder="0.00"
-            />
+            {formData.role === 'receptionist' && (
+              <Input 
+                label="Max Discount (%)" 
+                name="max_discount" 
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={formData.max_discount} 
+                onChange={handleChange} 
+                placeholder="0.00"
+              />
+            )}
           </div>
 
           <div className="w-full">
