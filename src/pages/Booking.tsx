@@ -42,6 +42,7 @@ export default function Booking() {
   const [testSearch, setTestSearch] = useState('');
   const [discount, setDiscount] = useState(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [estimateDeliveryDate, setEstimateDeliveryDate] = useState<string>('');
   
   // Suggestion State (Shared)
   const [patientSuggestions, setPatientSuggestions] = useState<any[]>([]);
@@ -252,6 +253,7 @@ export default function Booking() {
           total_amount: totalAmount,
           amount_paid: paidAmount,
           amount_due: amountDue,
+          estimate_delivery_date: estimateDeliveryDate ? new Date(estimateDeliveryDate).toISOString() : null,
           status: amountDue <= 0 ? 'paid' : 'pending'
         })
         .select()
@@ -265,7 +267,9 @@ export default function Booking() {
         test_name: t.name,
         price: t.price,
         discount: 0,
-        final_price: t.price
+        final_price: t.price,
+        expected_delivery: estimateDeliveryDate ? new Date(estimateDeliveryDate).toISOString() : null,
+        report_status: 'Pending'
       }));
 
       const { error: itemsError } = await supabase.from('bill_items').insert(billItems);
@@ -276,6 +280,7 @@ export default function Booking() {
       setSelectedTests([]);
       setDiscount(0);
       setPaidAmount(0);
+      setEstimateDeliveryDate('');
       success('Success', 'Test Bill Generated Successfully!');
       navigate(`/billing?billId=${bill.id}&print=true`);
       fetchInitialData();
@@ -288,7 +293,7 @@ export default function Booking() {
 
   const renderPatientInfoCard = () => (
     <Card className="overflow-visible">
-      <CardHeader className="flex flex-row items-center gap-3">
+      <CardHeader className="flex flex-row justify-start items-center gap-3">
         <div className="p-2 bg-primary-50 rounded-lg text-primary-600">
           <User className="w-5 h-5" />
         </div>
@@ -297,7 +302,7 @@ export default function Booking() {
           <p className="text-xs text-slate-500">Enter patient details. Suggestions will appear as you type name or phone.</p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6 pt-0">
+      <CardContent className="space-y-6 pt-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <Input 
@@ -605,6 +610,17 @@ export default function Booking() {
                           </div>
                         </div>
                      </div>
+                     
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Est. Delivery Date</label>
+                        <input 
+                          type="date"
+                          className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-white focus:border-primary-500 transition-all outline-none font-semibold text-sm"
+                          value={estimateDeliveryDate}
+                          onChange={(e) => setEstimateDeliveryDate(e.target.value)}
+                          required
+                        />
+                     </div>
 
                      <div className="flex justify-between items-center px-2">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Due</span>
@@ -623,7 +639,7 @@ export default function Booking() {
                 <Button 
                   variant="primary" 
                   className="w-full py-4 text-lg shadow-xl shadow-primary-500/20 font-bold rounded-2xl"
-                  disabled={!patientForm.name || !patientForm.phone || selectedTests.length === 0 || submitting}
+                  disabled={!patientForm.name || !patientForm.phone || selectedTests.length === 0 || !estimateDeliveryDate || submitting}
                   onClick={handleTestSubmit}
                   isLoading={submitting}
                 >
