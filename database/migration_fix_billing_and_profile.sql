@@ -37,11 +37,21 @@ WHERE estimate_delivery_date IS NULL;
 DROP POLICY IF EXISTS "Allow selective bill access" ON bills;
 CREATE POLICY "Allow selective bill access" ON bills FOR SELECT USING (
   auth.role() = 'authenticated' AND (
-    public.get_my_role() IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager')
+    public.get_my_role() IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor')
   )
 );
 
 -- 5. Update profiles RLS
+DROP POLICY IF EXISTS "Allow authenticated read access" ON profiles;
+CREATE POLICY "Allow authenticated read access" ON profiles FOR SELECT USING (
+  auth.role() = 'authenticated' AND (
+    public.get_my_role() = 'super_admin' OR 
+    (public.get_my_role() = 'diag_manager' AND role != 'super_admin') OR
+    (public.get_my_role() NOT IN ('super_admin', 'diag_manager') AND id = auth.uid()) OR
+    (public.get_my_role() IN ('receptionist', 'doctor', 'account_manager') AND role IN ('doctor', 'receptionist', 'diag_manager', 'super_admin'))
+  )
+);
+
 DROP POLICY IF EXISTS "Allow users to update own profile" ON profiles;
 CREATE POLICY "Allow users to update own profile" ON profiles FOR UPDATE USING (
   auth.uid() = id

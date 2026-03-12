@@ -208,12 +208,7 @@ DROP POLICY IF EXISTS "Allow selective notification access" ON notifications;
 DROP POLICY IF EXISTS "Allow authenticated all" ON notifications;
 
 -- RLS Policies for Profiles
-CREATE POLICY "Allow authenticated read access" ON profiles FOR SELECT USING (
-  auth.role() = 'authenticated' AND (
-    public.get_my_role() = 'super_admin' OR 
-    (public.get_my_role() = 'diag_manager' AND role != 'super_admin') OR
-    (public.get_my_role() NOT IN ('super_admin', 'diag_manager') AND id = auth.uid()) OR
-    (public.get_my_role() IN ('receptionist', 'doctor', 'account_manager') AND role = 'doctor')
+    (public.get_my_role() IN ('receptionist', 'doctor', 'account_manager') AND role IN ('doctor', 'receptionist', 'diag_manager', 'super_admin'))
   )
 );
 
@@ -276,7 +271,7 @@ CREATE POLICY "Allow authenticated update" ON visits FOR UPDATE USING (auth.role
 -- RLS Policies for Bills
 CREATE POLICY "Allow selective bill access" ON bills FOR SELECT USING (
   auth.role() = 'authenticated' AND (
-    public.get_my_role() IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager')
+    public.get_my_role() IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor')
   )
 );
 
