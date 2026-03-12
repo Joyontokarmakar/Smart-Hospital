@@ -264,6 +264,7 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
                 value={formData.max_discount} 
                 onChange={handleChange} 
                 placeholder="0.00"
+                disabled={!(currentProfile?.role === 'super_admin' || currentProfile?.role === 'diag_manager')}
               />
             )}
           </div>

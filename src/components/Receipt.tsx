@@ -14,9 +14,8 @@ export function Receipt({ bill, settings, onBack, onNew }: ReceiptProps) {
   if (!bill) return null;
 
   const items = bill.items || bill.bill_items || [];
-  const estimateDeliveryDate = items.length > 0 && items[0].expected_delivery 
-    ? new Date(items[0].expected_delivery) 
-    : null;
+  const rawDate = bill.estimate_delivery_date || (items.length > 0 ? items[0].expected_delivery : null);
+  const estimateDeliveryDate = rawDate ? new Date(rawDate) : null;
 
   return (
     <div className="space-y-6">
