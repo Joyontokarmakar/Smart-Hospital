@@ -1,10 +1,16 @@
 -- migration_fix_billing_and_profile.sql
 
--- 1. Ensure bill_items has expected_delivery column (in case table existed but was old)
+-- 1. Ensure bill_items has needed columns (in case table existed but was old)
 DO $$ 
 BEGIN 
+  -- Check expected_delivery
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bill_items' AND column_name='expected_delivery') THEN
     ALTER TABLE bill_items ADD COLUMN expected_delivery TIMESTAMPTZ;
+  END IF;
+
+  -- Check report_status
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bill_items' AND column_name='report_status') THEN
+    ALTER TABLE bill_items ADD COLUMN report_status TEXT DEFAULT 'Pending' CHECK (report_status IN ('Pending', 'Processing', 'Ready', 'Delivered'));
   END IF;
 END $$;
 
