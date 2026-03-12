@@ -207,8 +207,8 @@ export default function Booking() {
   const totalAmount = subtotal - discount;
   const amountDue = totalAmount - paidAmount;
   
-  const maxDiscountPercentage = profile?.max_discount || 0;
-  const maxDiscountAmount = (subtotal * maxDiscountPercentage) / 100;
+   const maxDiscountPercentage = (profile?.role === 'doctor' || profile?.role === 'super_admin') ? 100 : (profile?.max_discount || 0);
+   const maxDiscountAmount = (subtotal * maxDiscountPercentage) / 100;
   
   const handleDiscountChange = (val: number) => {
     if (val > maxDiscountAmount) {
@@ -579,7 +579,7 @@ export default function Booking() {
                      <div className="space-y-2">
                         <label className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                           <span>Discount</span>
-                          <span className="text-secondary-600 font-mono">Max {profile?.max_discount || 0}%</span>
+                          <span className="text-secondary-600 font-mono">Max {maxDiscountPercentage}%</span>
                         </label>
                         <div className="relative">
                           <div className="w-full flex items-center px-3 py-2 border border-slate-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary-500/10 focus-within:border-primary-500 transition-all">
