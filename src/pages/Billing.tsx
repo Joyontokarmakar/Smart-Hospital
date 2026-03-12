@@ -25,6 +25,7 @@ export default function Billing() {
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastCreatedBill, setLastCreatedBill] = useState<any>(null);
+  const [estimateDeliveryDate, setEstimateDeliveryDate] = useState<string>('');
 
   useEffect(() => {
     const billId = searchParams.get('billId');
@@ -75,7 +76,7 @@ export default function Billing() {
     setLoading(true);
     const { data } = await supabase
       .from('bills')
-      .select('*, patients(name, phone), profiles!receptionist_id(full_name)')
+      .select('*, patients(name, phone), profiles!receptionist_id(full_name), bill_items(expected_delivery)')
       .order('created_at', { ascending: false });
     if (data) setBills(data);
     setLoading(false);
@@ -106,25 +107,15 @@ export default function Billing() {
     if (!testId) return;
     const test = allTests.find(t => t.id === testId);
     if (test && !selectedTests.find(t => t.id === test.id)) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
       setSelectedTests([...selectedTests, { 
         ...test, 
-        appliedDiscount: 0,
-        expected_delivery: tomorrow.toISOString().split('T')[0]
+        appliedDiscount: 0
       }]);
     }
   };
 
   const handleRemoveTest = (testId: string) => {
     setSelectedTests(selectedTests.filter(t => t.id !== testId));
-  };
-
-  const handleDeliveryChange = (testId: string, value: string) => {
-    setSelectedTests(selectedTests.map(t => {
-      if (t.id === testId) return { ...t, expected_delivery: value };
-      return t;
-    }));
   };
 
   const handleDiscountChange = (testId: string, value: string) => {
@@ -151,6 +142,7 @@ export default function Billing() {
 
   const handleCreateBill = async () => {
     if (selectedTests.length === 0) return alert('Select at least one test.');
+    if (!estimateDeliveryDate) return showError('Required Field', 'Please provide an Estimate Delivery Date.');
 
     try {
       setLoading(true);
@@ -180,7 +172,7 @@ export default function Billing() {
         price: t.price,
         discount: t.appliedDiscount,
         final_price: t.price - t.appliedDiscount,
-        expected_delivery: t.expected_delivery ? new Date(t.expected_delivery).toISOString() : null,
+        expected_delivery: estimateDeliveryDate ? new Date(estimateDeliveryDate).toISOString() : null,
         report_status: 'Pending'
       }));
 
@@ -219,6 +211,7 @@ export default function Billing() {
           setLastCreatedBill(null);
           setSelectedTests([]);
           setAmountPaid('');
+          setEstimateDeliveryDate('');
           navigate('/billing');
         }}
       />
@@ -286,7 +279,6 @@ export default function Billing() {
                           <th className="px-6 py-4 font-semibold text-right">Price</th>
                           <th className="px-6 py-4 font-semibold text-right" title="Cannot exceed max discount">Disc. (৳)</th>
                           <th className="px-6 py-4 font-semibold text-right">Net</th>
-                          <th className="px-6 py-4 font-semibold">Delivery Date</th>
                           <th className="px-6 py-4 font-semibold text-center">Action</th>
                         </tr>
                       </thead>
@@ -312,14 +304,6 @@ export default function Billing() {
                             </td>
                             <td className="px-6 py-4 text-sm font-medium text-primary-700 text-right">
                               ৳{(t.price - t.appliedDiscount).toFixed(2)}
-                            </td>
-                            <td className="px-6 py-4">
-                              <input 
-                                type="date"
-                                className="border border-slate-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-primary-500 min-w-[120px]"
-                                value={t.expected_delivery || ''}
-                                onChange={(e) => handleDeliveryChange(t.id, e.target.value)}
-                              />
                             </td>
                             <td className="px-6 py-4 text-center">
                               <button onClick={() => handleRemoveTest(t.id)} className="text-error-500 hover:text-error-700 text-sm font-medium">Remove</button>
@@ -367,6 +351,16 @@ export default function Billing() {
                   </div>
                   
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-slate-700">Estimate Delivery Date <span className="text-error-500">*</span></label>
+                      <input 
+                        type="date"
+                        className="w-32 lg:w-40 text-right border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        value={estimateDeliveryDate}
+                        onChange={(e) => setEstimateDeliveryDate(e.target.value)}
+                        required
+                      />
+                    </div>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-medium text-slate-700">Advance / Amount Paid</label>
                       <input 
@@ -434,11 +428,22 @@ export default function Billing() {
                     <td colSpan={4} className="px-6 py-12 text-center text-slate-500">No bills found.</td>
                   </tr>
                 ) : (
-                  bills.map(bill => (
+                  bills.map(bill => {
+                    const estimateDeliveryDate = bill.bill_items && bill.bill_items.length > 0 && bill.bill_items[0].expected_delivery
+                      ? new Date(bill.bill_items[0].expected_delivery).toLocaleDateString()
+                      : null;
+                    
+                    return (
                     <tr key={bill.id} className="hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0">
                       <td className="px-6 py-4">
                         <span className="text-xs font-bold text-slate-700">{new Date(bill.created_at).toLocaleDateString()}</span>
-                        <p className="text-[10px] text-slate-400 font-medium">{new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        {estimateDeliveryDate && (
+                          <div className="mt-1 pt-1 border-t border-slate-100">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Est. Delivery</p>
+                            <span className="text-[10px] font-medium text-slate-600 whitespace-nowrap">{estimateDeliveryDate}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-xs font-black text-slate-900">{bill.patients?.name || 'Unknown'}</span>
@@ -494,7 +499,7 @@ export default function Billing() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                  )})
                 )}
               </tbody>
             </table>

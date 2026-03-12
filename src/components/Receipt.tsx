@@ -1,4 +1,5 @@
 import { Printer, ArrowLeft } from 'lucide-react';
+import { format } from 'date-fns';
 import { Button } from './Button';
 import { Card, CardContent } from './Card';
 
@@ -11,6 +12,11 @@ interface ReceiptProps {
 
 export function Receipt({ bill, settings, onBack, onNew }: ReceiptProps) {
   if (!bill) return null;
+
+  const items = bill.items || bill.bill_items || [];
+  const estimateDeliveryDate = items.length > 0 && items[0].expected_delivery 
+    ? new Date(items[0].expected_delivery) 
+    : null;
 
   return (
     <div className="space-y-6">
@@ -74,8 +80,11 @@ export function Receipt({ bill, settings, onBack, onNew }: ReceiptProps) {
               <div className="text-right">
                 <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 print:text-black">Bill Details</h3>
                 <p className="text-sm text-slate-600 print:text-black"><span className="font-medium">Bill ID:</span> #{bill.id.slice(0, 8)}</p>
-                <p className="text-sm text-slate-600 print:text-black"><span className="font-medium">Date:</span> {new Date(bill.created_at).toLocaleDateString()}</p>
-                <p className="text-sm text-slate-600 print:text-black"><span className="font-medium">Time:</span> {new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                <p className="text-sm text-slate-600 print:text-black"><span className="font-medium">Billing Date:</span> {format(new Date(bill.created_at), 'EEEE, do MMMM yyyy')}</p>
+                {estimateDeliveryDate && (
+                  <p className="text-sm text-slate-600 print:text-black"><span className="font-medium">Est. Delivery:</span> {format(estimateDeliveryDate, 'EEEE, do MMMM yyyy')}</p>
+                )}
+                <p className="text-sm text-slate-600 mt-1 print:text-black"><span className="font-medium">Time:</span> {new Date(bill.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
               </div>
             </div>
 
@@ -94,9 +103,6 @@ export function Receipt({ bill, settings, onBack, onNew }: ReceiptProps) {
                   <tr key={item.id || item.test_id}>
                     <td className="py-4">
                       <p className="font-medium text-slate-900 print:text-black">{item.test_name}</p>
-                      {item.expected_delivery && (
-                        <p className="text-[10px] text-slate-400 print:text-black">Delivery: {new Date(item.expected_delivery).toLocaleDateString()}</p>
-                      )}
                     </td>
                     <td className="py-4 text-right text-sm text-slate-600 print:text-black">৳{item.price.toFixed(2)}</td>
                     <td className="py-4 text-right text-sm text-slate-600 print:text-black">৳{item.discount.toFixed(2)}</td>

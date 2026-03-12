@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { User, Calendar, ChevronRight, UserPlus, Stethoscope, Clock, CheckCircle2, ClipboardList, Plus, Search, FileText, Clipboard, Activity, Check } from 'lucide-react';
+import { User, ChevronRight, Stethoscope, Clock, CheckCircle2, ClipboardList, Search, FileText, Clipboard, Activity, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/Card';
@@ -15,7 +15,7 @@ export default function Booking() {
   const navigate = useNavigate();
   const { success, error: showError, warning } = useNotification();
   const [activeTab, setActiveTab] = useState<Tab>('Visit');
-  const [loading, setLoading] = useState(true);
+
   const [submitting, setSubmitting] = useState(false);
   
   // Data State
@@ -61,7 +61,6 @@ export default function Booking() {
   }, []);
 
   const fetchInitialData = async () => {
-    setLoading(true);
     // Fetch Patients
     const { data: pData } = await supabase.from('patients').select('*').order('created_at', { ascending: false });
     if (pData) setPatients(pData);
@@ -85,8 +84,6 @@ export default function Booking() {
       .eq('visit_date', today)
       .order('created_at', { ascending: false });
     if (vData) setTodayBookings(vData);
-
-    setLoading(false);
   };
 
   const handlePatientFieldChange = (field: string, val: string) => {
