@@ -230,7 +230,7 @@ CREATE POLICY "Allow users to update own profile" ON profiles FOR UPDATE USING (
 );
 
 -- RLS Policies for Doctors Info
-CREATE POLICY "Allow authenticated read doctors" ON doctors_info FOR SELECT USING (
+CREATE POLICY "Allow selective doctor_info access" ON doctors_info FOR SELECT USING (
   auth.role() = 'authenticated' AND (
     public.get_my_role() = 'super_admin' OR
     (public.get_my_role() = 'diag_manager' AND EXISTS (
@@ -238,6 +238,17 @@ CREATE POLICY "Allow authenticated read doctors" ON doctors_info FOR SELECT USIN
       WHERE profiles.id = doctors_info.id AND profiles.role != 'super_admin'
     )) OR
     public.get_my_role() NOT IN ('super_admin', 'diag_manager')
+  )
+);
+
+CREATE POLICY "Allow super_admin all" ON doctors_info FOR ALL USING (
+  public.get_my_role() = 'super_admin'
+);
+
+CREATE POLICY "Allow diag_manager all non-admins" ON doctors_info FOR ALL USING (
+  public.get_my_role() = 'diag_manager' AND EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE profiles.id = doctors_info.id AND profiles.role != 'super_admin'
   )
 );
 
