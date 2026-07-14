@@ -1,25 +1,56 @@
 -- Database Schema for Smart Hospital and Diagnostic Management System
 
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+----------------------------------------------------
+-- CLEANUP EXISTING CONFLICTS (CASCADE)
+----------------------------------------------------
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users CASCADE;
+
+
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.get_my_role() CASCADE;
+DROP FUNCTION IF EXISTS public.get_visit_notification_message(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.get_bill_notification_message(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.notify_new_visit_trigger() CASCADE;
+DROP FUNCTION IF EXISTS public.notify_new_bill_trigger() CASCADE;
+
+DROP TABLE IF EXISTS public.hospital_settings CASCADE;
+DROP TABLE IF EXISTS public.notifications CASCADE;
+DROP TABLE IF EXISTS public.receptionist_logs CASCADE;
+DROP TABLE IF EXISTS public.bill_items CASCADE;
+DROP TABLE IF EXISTS public.bills CASCADE;
+DROP TABLE IF EXISTS public.visits CASCADE;
+DROP TABLE IF EXISTS public.patients CASCADE;
+DROP TABLE IF EXISTS public.tests CASCADE;
+DROP TABLE IF EXISTS public.doctors_info CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+----------------------------------------------------
+-- TABLE CREATION
+----------------------------------------------------
+
 -- 1. Profiles Table (Extends Supabase Auth Auth.users)
-CREATE TABLE IF NOT EXISTS profiles (
+CREATE TABLE public.profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   full_name TEXT NOT NULL,
+  email TEXT,
   role TEXT NOT NULL CHECK (role IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor')),
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  max_discount DECIMAL(10, 2) DEFAULT 0.00,
   notify_new_visits BOOLEAN DEFAULT false,
   notify_new_tests BOOLEAN DEFAULT false,
+  notify_own_visits_only BOOLEAN DEFAULT false,
+  notify_own_tests_only BOOLEAN DEFAULT false,
+  phone TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ensure columns exist in case table was created before notifications feature
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_new_visits BOOLEAN DEFAULT false;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_new_tests BOOLEAN DEFAULT false;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
-
 -- 2. Doctors Info Table (Supplementary info for doctors)
-CREATE TABLE IF NOT EXISTS doctors_info (
-  id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
+CREATE TABLE public.doctors_info (
+  id UUID REFERENCES public.profiles(id) ON DELETE CASCADE PRIMARY KEY,
   degrees TEXT NOT NULL,
   specialization TEXT NOT NULL,
   current_job_title TEXT NOT NULL,
@@ -30,12 +61,8 @@ CREATE TABLE IF NOT EXISTS doctors_info (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ensure optional columns exist if table was created earlier
-ALTER TABLE doctors_info ADD COLUMN IF NOT EXISTS phone_number TEXT;
-ALTER TABLE doctors_info ADD COLUMN IF NOT EXISTS bmdc_number TEXT;
-
 -- 3. Tests Table (Managed by Super Admin / Diag Manager)
-CREATE TABLE IF NOT EXISTS tests (
+CREATE TABLE public.tests (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   price DECIMAL(10, 2) NOT NULL,
@@ -45,7 +72,7 @@ CREATE TABLE IF NOT EXISTS tests (
 );
 
 -- 4. Patients Table
-CREATE TABLE IF NOT EXISTS patients (
+CREATE TABLE public.patients (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   phone TEXT UNIQUE NOT NULL,
@@ -56,15 +83,12 @@ CREATE TABLE IF NOT EXISTS patients (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Ensure missing columns exist in patients table
-ALTER TABLE patients ADD COLUMN IF NOT EXISTS blood_group TEXT CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'));
-
 -- 5. Visits Table (Doctor Appointments)
-CREATE TABLE IF NOT EXISTS visits (
+CREATE TABLE public.visits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
-  doctor_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  receptionist_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  patient_id UUID REFERENCES public.patients(id) ON DELETE CASCADE,
+  doctor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  receptionist_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   status TEXT DEFAULT 'queued' CHECK (status IN ('queued', 'in_progress', 'completed', 'cancelled')),
   visit_date DATE NOT NULL DEFAULT CURRENT_DATE,
   serial_number INTEGER,
@@ -74,10 +98,10 @@ CREATE TABLE IF NOT EXISTS visits (
 );
 
 -- 6. Bills Table
-CREATE TABLE IF NOT EXISTS bills (
+CREATE TABLE public.bills (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
-  receptionist_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  patient_id UUID REFERENCES public.patients(id) ON DELETE CASCADE,
+  receptionist_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   subtotal DECIMAL(10, 2) NOT NULL,
   total_discount DECIMAL(10, 2) DEFAULT 0.00,
   total_amount DECIMAL(10, 2) NOT NULL,
@@ -90,10 +114,10 @@ CREATE TABLE IF NOT EXISTS bills (
 );
 
 -- 7. Bill Items Table (Junction for Bills and Tests)
-CREATE TABLE IF NOT EXISTS bill_items (
+CREATE TABLE public.bill_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  bill_id UUID REFERENCES bills(id) ON DELETE CASCADE,
-  test_id UUID REFERENCES tests(id) ON DELETE SET NULL,
+  bill_id UUID REFERENCES public.bills(id) ON DELETE CASCADE,
+  test_id UUID REFERENCES public.tests(id) ON DELETE SET NULL,
   test_name TEXT NOT NULL, -- Stored historically in case test name changes
   price DECIMAL(10, 2) NOT NULL,
   discount DECIMAL(10, 2) DEFAULT 0.00,
@@ -104,18 +128,18 @@ CREATE TABLE IF NOT EXISTS bill_items (
 );
 
 -- 8. Receptionist Logs Table
-CREATE TABLE IF NOT EXISTS receptionist_logs (
+CREATE TABLE public.receptionist_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  receptionist_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  receptionist_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   login_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   logout_time TIMESTAMPTZ,
   date DATE NOT NULL DEFAULT CURRENT_DATE
 );
 
 -- 9. Notifications Table
-CREATE TABLE IF NOT EXISTS notifications (
+CREATE TABLE public.notifications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   message TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('visit', 'test', 'system')),
@@ -123,6 +147,26 @@ CREATE TABLE IF NOT EXISTS notifications (
   related_entity_id UUID, -- Can link to a visit_id or test_id
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 10. Global Hospital Settings Table
+CREATE TABLE public.hospital_settings (
+  id INT PRIMARY KEY CHECK (id = 1), -- Enforce single row
+  name TEXT NOT NULL DEFAULT 'Smart Hospital',
+  address TEXT NOT NULL DEFAULT '123 Health Ave, Medical District',
+  contact_info TEXT NOT NULL DEFAULT 'Phone: +880-1234-567890 | Email: contact@smarthospital.com',
+  logo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Pre-populate the single row if it doesn't exist
+INSERT INTO public.hospital_settings (id, name, address, contact_info)
+VALUES (1, 'Smart Hospital', '123 Health Ave, Medical District', 'Phone: +880-1234-567890 | Email: contact@smarthospital.com')
+ON CONFLICT (id) DO NOTHING;
+
+----------------------------------------------------
+-- FUNCTIONS & TRIGGERS FOR USER SIGNUP
+----------------------------------------------------
 
 -- Function to handle new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -138,6 +182,7 @@ BEGIN
   INSERT INTO public.profiles (
     id, 
     full_name, 
+    email,
     role, 
     notify_new_visits, 
     notify_new_tests,
@@ -147,13 +192,18 @@ BEGIN
   VALUES (
     new.id, 
     COALESCE(new.raw_user_meta_data->>'full_name', 'System User'), 
+    new.email,
     assigned_role,
     notifications_enabled,
     notifications_enabled,
     false,
     false
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name,
+    role = EXCLUDED.role;
+    
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -164,16 +214,9 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Enable Row Level Security (RLS) on all tables
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE doctors_info ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE visits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bills ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bill_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE receptionist_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+----------------------------------------------------
+-- SECURITY DEFINER ROLE GETTER
+----------------------------------------------------
 
 -- Security definer function to get the user's role safely
 CREATE OR REPLACE FUNCTION public.get_my_role()
@@ -185,77 +228,91 @@ AS $$
   SELECT role FROM profiles WHERE id = auth.uid();
 $$;
 
--- Drop existing policies to avoid conflicts
-DROP POLICY IF EXISTS "Allow authenticated read access" ON profiles;
-DROP POLICY IF EXISTS "Allow super_admin all" ON profiles;
-DROP POLICY IF EXISTS "Allow diag_manager select/update non-admins" ON profiles;
-DROP POLICY IF EXISTS "Allow diag_manager all non-admins" ON profiles;
-DROP POLICY IF EXISTS "Allow users to update own profile" ON profiles;
-DROP POLICY IF EXISTS "Allow authenticated read doctors" ON doctors_info;
-DROP POLICY IF EXISTS "Allow authenticated all" ON doctors_info;
-DROP POLICY IF EXISTS "Allow authenticated all" ON tests;
-DROP POLICY IF EXISTS "Allow authenticated all" ON patients;
-DROP POLICY IF EXISTS "Allow selective visit access" ON visits;
-DROP POLICY IF EXISTS "Allow authenticated insert" ON visits;
-DROP POLICY IF EXISTS "Allow authenticated update" ON visits;
-DROP POLICY IF EXISTS "Allow selective bill access" ON bills;
-DROP POLICY IF EXISTS "Allow authenticated insert" ON bills;
-DROP POLICY IF EXISTS "Allow authenticated update" ON bills;
-DROP POLICY IF EXISTS "Allow authenticated all" ON bill_items;
-DROP POLICY IF EXISTS "Allow selective log access" ON receptionist_logs;
-DROP POLICY IF EXISTS "Allow authenticated all" ON receptionist_logs;
-DROP POLICY IF EXISTS "Allow selective notification access" ON notifications;
-DROP POLICY IF EXISTS "Allow authenticated all" ON notifications;
+----------------------------------------------------
+-- ROW LEVEL SECURITY (RLS) & POLICIES
+----------------------------------------------------
 
--- RLS Policies for Profiles
+-- Enable Row Level Security (RLS) on all tables
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.doctors_info ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.patients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.visits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bill_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.receptionist_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hospital_settings ENABLE ROW LEVEL SECURITY;
+
+-- 1. Profiles Policies
+DROP POLICY IF EXISTS "Allow authenticated read access" ON public.profiles;
+CREATE POLICY "Allow authenticated read access" ON public.profiles FOR SELECT USING (
+  auth.role() = 'authenticated' AND (
+    public.get_my_role() = 'super_admin' OR 
+    (public.get_my_role() = 'diag_manager' AND role != 'super_admin') OR
+    (public.get_my_role() NOT IN ('super_admin', 'diag_manager') AND id = auth.uid()) OR
     (public.get_my_role() IN ('receptionist', 'doctor', 'account_manager') AND role IN ('doctor', 'receptionist', 'diag_manager', 'super_admin'))
   )
 );
 
-CREATE POLICY "Allow super_admin all" ON profiles FOR ALL USING (
+DROP POLICY IF EXISTS "Allow super_admin all" ON public.profiles;
+CREATE POLICY "Allow super_admin all" ON public.profiles FOR ALL USING (
   public.get_my_role() = 'super_admin'
 );
 
-CREATE POLICY "Allow diag_manager all non-admins" ON profiles FOR ALL USING (
+DROP POLICY IF EXISTS "Allow diag_manager all non-admins" ON public.profiles;
+CREATE POLICY "Allow diag_manager all non-admins" ON public.profiles FOR ALL USING (
   public.get_my_role() = 'diag_manager' AND role != 'super_admin'
 );
 
-CREATE POLICY "Allow users to update own profile" ON profiles FOR UPDATE USING (
+DROP POLICY IF EXISTS "Allow users to update own profile" ON public.profiles;
+CREATE POLICY "Allow users to update own profile" ON public.profiles FOR UPDATE USING (
+  auth.uid() = id
+) WITH CHECK (
   auth.uid() = id
 );
 
--- RLS Policies for Doctors Info
-CREATE POLICY "Allow selective doctor_info access" ON doctors_info FOR SELECT USING (
+-- 2. Doctors Info Policies
+DROP POLICY IF EXISTS "Allow selective doctor_info access" ON public.doctors_info;
+CREATE POLICY "Allow selective doctor_info access" ON public.doctors_info FOR SELECT USING (
   auth.role() = 'authenticated' AND (
     public.get_my_role() = 'super_admin' OR
     (public.get_my_role() = 'diag_manager' AND EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.id = doctors_info.id AND profiles.role != 'super_admin'
+      SELECT 1 FROM public.profiles 
+      WHERE public.profiles.id = doctors_info.id AND public.profiles.role != 'super_admin'
     )) OR
     public.get_my_role() NOT IN ('super_admin', 'diag_manager')
   )
 );
 
-CREATE POLICY "Allow super_admin all" ON doctors_info FOR ALL USING (
+DROP POLICY IF EXISTS "Allow super_admin all" ON public.doctors_info;
+CREATE POLICY "Allow super_admin all" ON public.doctors_info FOR ALL USING (
   public.get_my_role() = 'super_admin'
 );
 
-CREATE POLICY "Allow diag_manager all non-admins" ON doctors_info FOR ALL USING (
+DROP POLICY IF EXISTS "Allow diag_manager all non-admins" ON public.doctors_info;
+CREATE POLICY "Allow diag_manager all non-admins" ON public.doctors_info FOR ALL USING (
   public.get_my_role() = 'diag_manager' AND EXISTS (
-    SELECT 1 FROM profiles 
-    WHERE profiles.id = doctors_info.id AND profiles.role != 'super_admin'
+    SELECT 1 FROM public.profiles 
+    WHERE public.profiles.id = doctors_info.id AND public.profiles.role != 'super_admin'
   )
 );
 
-CREATE POLICY "Allow authenticated all" ON tests FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated all" ON patients FOR ALL USING (auth.role() = 'authenticated');
+-- 3. Tests Policies
+DROP POLICY IF EXISTS "Allow authenticated all" ON public.tests;
+CREATE POLICY "Allow authenticated all" ON public.tests FOR ALL USING (auth.role() = 'authenticated');
 
--- RLS Policies for Visits
-CREATE POLICY "Allow selective visit access" ON visits FOR SELECT USING (
+-- 4. Patients Policies
+DROP POLICY IF EXISTS "Allow authenticated all" ON public.patients;
+CREATE POLICY "Allow authenticated all" ON public.patients FOR ALL USING (auth.role() = 'authenticated');
+
+-- 5. Visits Policies
+DROP POLICY IF EXISTS "Allow selective visit access" ON public.visits;
+CREATE POLICY "Allow selective visit access" ON public.visits FOR SELECT USING (
   auth.role() = 'authenticated' AND (
     public.get_my_role() = 'super_admin' OR
     (public.get_my_role() = 'diag_manager' AND NOT EXISTS (
-      SELECT 1 FROM profiles 
+      SELECT 1 FROM public.profiles 
       WHERE id IN (visits.doctor_id, visits.receptionist_id) 
       AND role = 'super_admin'
     )) OR
@@ -265,63 +322,112 @@ CREATE POLICY "Allow selective visit access" ON visits FOR SELECT USING (
   )
 );
 
-CREATE POLICY "Allow authenticated insert" ON visits FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated update" ON visits FOR UPDATE USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow authenticated insert" ON public.visits;
+CREATE POLICY "Allow authenticated insert" ON public.visits FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
--- RLS Policies for Bills
-CREATE POLICY "Allow selective bill access" ON bills FOR SELECT USING (
+DROP POLICY IF EXISTS "Allow authenticated update" ON public.visits;
+CREATE POLICY "Allow authenticated update" ON public.visits FOR UPDATE USING (auth.role() = 'authenticated');
+
+-- 6. Bills Policies
+DROP POLICY IF EXISTS "Allow selective bill access" ON public.bills;
+CREATE POLICY "Allow selective bill access" ON public.bills FOR SELECT USING (
   auth.role() = 'authenticated' AND (
     public.get_my_role() IN ('super_admin', 'diag_manager', 'receptionist', 'account_manager', 'doctor')
   )
 );
 
-CREATE POLICY "Allow authenticated insert" ON bills FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated update" ON bills FOR UPDATE USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow authenticated insert" ON public.bills;
+CREATE POLICY "Allow authenticated insert" ON public.bills FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
-CREATE POLICY "Allow authenticated all" ON bill_items FOR ALL USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Allow authenticated update" ON public.bills;
+CREATE POLICY "Allow authenticated update" ON public.bills FOR UPDATE USING (auth.role() = 'authenticated');
 
--- RLS Policies for Receptionist Logs
-CREATE POLICY "Allow selective log access" ON receptionist_logs FOR SELECT USING (
+-- 7. Bill Items Policies
+DROP POLICY IF EXISTS "Allow authenticated all" ON public.bill_items;
+CREATE POLICY "Allow authenticated all" ON public.bill_items FOR ALL USING (auth.role() = 'authenticated');
+
+-- 8. Receptionist Logs Policies
+DROP POLICY IF EXISTS "Allow selective log access" ON public.receptionist_logs;
+CREATE POLICY "Allow selective log access" ON public.receptionist_logs FOR SELECT USING (
   auth.role() = 'authenticated' AND (
     public.get_my_role() = 'super_admin' OR
     (public.get_my_role() = 'diag_manager' AND EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE profiles.id = receptionist_logs.receptionist_id AND profiles.role != 'super_admin'
+      SELECT 1 FROM public.profiles 
+      WHERE public.profiles.id = receptionist_logs.receptionist_id AND public.profiles.role != 'super_admin'
     ))
   )
 );
 
--- RLS Policies for Notifications
-CREATE POLICY "Allow selective notification access" ON notifications FOR SELECT USING (
+DROP POLICY IF EXISTS "Allow authenticated insert" ON public.receptionist_logs;
+CREATE POLICY "Allow authenticated insert" ON public.receptionist_logs FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- 9. Notifications Policies
+DROP POLICY IF EXISTS "Allow selective notification access" ON public.notifications;
+CREATE POLICY "Allow selective notification access" ON public.notifications FOR SELECT USING (
   auth.role() = 'authenticated' AND (
     user_id = auth.uid() OR public.get_my_role() = 'super_admin'
   )
 );
 
--- Enable realtime for visits, bills, and notifications
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'visits'
-  ) THEN
-    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE visits';
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'bills'
-  ) THEN
-    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE bills';
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'notifications'
-  ) THEN
-    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE notifications';
-  END IF;
-END $$;
+DROP POLICY IF EXISTS "Allow users to update own notifications" ON public.notifications;
+CREATE POLICY "Allow users to update own notifications" ON public.notifications FOR UPDATE USING (
+  auth.uid() = user_id
+) WITH CHECK (
+  auth.uid() = user_id
+);
 
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_own_visits_only BOOLEAN DEFAULT false;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notify_own_tests_only BOOLEAN DEFAULT false;
+-- 10. Hospital Settings Policies
+DROP POLICY IF EXISTS "Allow authenticated read access" ON public.hospital_settings;
+CREATE POLICY "Allow authenticated read access" ON public.hospital_settings FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Allow admin/manager update" ON public.hospital_settings;
+CREATE POLICY "Allow admin/manager update" ON public.hospital_settings FOR UPDATE USING (public.get_my_role() IN ('super_admin', 'diag_manager'));
+
+----------------------------------------------------
+-- NOTIFICATION TRIGGERS AND HELPER FUNCTIONS
+----------------------------------------------------
+
+-- Function to get detailed visit notification message
+CREATE OR REPLACE FUNCTION public.get_visit_notification_message(visit_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+  p_name TEXT;
+  d_name TEXT;
+  v_date DATE;
+BEGIN
+  SELECT p.name, pr.full_name, v.visit_date 
+  INTO p_name, d_name, v_date
+  FROM public.visits v
+  JOIN public.patients p ON v.patient_id = p.id
+  JOIN public.profiles pr ON v.doctor_id = pr.id
+  WHERE v.id = visit_id;
+
+  RETURN p_name || ' scheduled for ' || d_name || ' on ' || v_date;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get detailed bill notification message
+CREATE OR REPLACE FUNCTION public.get_bill_notification_message(bill_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+  p_name TEXT;
+  test_list TEXT;
+  t_amount DECIMAL;
+BEGIN
+  SELECT p.name, b.total_amount
+  INTO p_name, t_amount
+  FROM public.bills b
+  JOIN public.patients p ON b.patient_id = p.id
+  WHERE b.id = bill_id;
+
+  SELECT string_agg(test_name, ', ')
+  INTO test_list
+  FROM public.bill_items
+  WHERE bill_id = bill_id;
+
+  RETURN p_name || ' - [' || COALESCE(test_list, 'No Tests') || '] - ৳' || t_amount;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Automatically create notifications for new visits
 CREATE OR REPLACE FUNCTION public.notify_new_visit_trigger()
@@ -329,19 +435,23 @@ RETURNS trigger AS $$
 DECLARE
   creator_role TEXT;
   doctor_is_admin BOOLEAN;
+  detailed_message TEXT;
 BEGIN
   -- Get role of the receptionist
-  SELECT role INTO creator_role FROM profiles WHERE id = new.receptionist_id;
+  SELECT role INTO creator_role FROM public.profiles WHERE id = new.receptionist_id;
   
   -- Check if doctor is admin
-  SELECT (role = 'super_admin') INTO doctor_is_admin FROM profiles WHERE id = new.doctor_id;
+  SELECT (role = 'super_admin') INTO doctor_is_admin FROM public.profiles WHERE id = new.doctor_id;
+  
+  -- Get detailed message
+  detailed_message := public.get_visit_notification_message(new.id);
   
   -- Insert notifications for users
   INSERT INTO public.notifications (user_id, title, message, type, related_entity_id)
   SELECT 
     p.id, 
     'New Patient Visit', 
-    'A new patient visit has been added.', 
+    detailed_message, 
     'visit', 
     new.id
   FROM public.profiles p
@@ -368,16 +478,20 @@ CREATE OR REPLACE FUNCTION public.notify_new_bill_trigger()
 RETURNS trigger AS $$
 DECLARE
   creator_role TEXT;
+  detailed_message TEXT;
 BEGIN
   -- Get role of the receptionist
-  SELECT role INTO creator_role FROM profiles WHERE id = new.receptionist_id;
+  SELECT role INTO creator_role FROM public.profiles WHERE id = new.receptionist_id;
+
+  -- Get detailed message
+  detailed_message := public.get_bill_notification_message(new.id);
 
   -- Insert notifications for users
   INSERT INTO public.notifications (user_id, title, message, type, related_entity_id)
   SELECT 
     p.id, 
     'New Test Billed', 
-    'A new test bill has been generated.', 
+    detailed_message, 
     'test', 
     new.id
   FROM public.profiles p
@@ -401,47 +515,46 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- DROP AND RECREATE TRIGGERS
-DROP TRIGGER IF EXISTS on_visit_created ON visits;
+-- Bind triggers to tables
+DROP TRIGGER IF EXISTS on_visit_created ON public.visits;
 CREATE TRIGGER on_visit_created
-  AFTER INSERT ON visits
+  AFTER INSERT ON public.visits
   FOR EACH ROW EXECUTE PROCEDURE public.notify_new_visit_trigger();
 
-DROP TRIGGER IF EXISTS on_bill_created ON bills;
+DROP TRIGGER IF EXISTS on_bill_created ON public.bills;
 CREATE TRIGGER on_bill_created
-  AFTER INSERT ON bills
+  AFTER INSERT ON public.bills
   FOR EACH ROW EXECUTE PROCEDURE public.notify_new_bill_trigger();
 
+----------------------------------------------------
+-- SUPABASE REALTIME CONFIGURATION
+----------------------------------------------------
 
--- 10. Global Hospital Settings Table
-CREATE TABLE IF NOT EXISTS hospital_settings (
-  id INT PRIMARY KEY CHECK (id = 1), -- Enforce single row
-  name TEXT NOT NULL DEFAULT 'Smart Hospital',
-  address TEXT NOT NULL DEFAULT '123 Health Ave, Medical District',
-  contact_info TEXT NOT NULL DEFAULT 'Phone: +880-1234-567890 | Email: contact@smarthospital.com',
-  logo_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'visits'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE visits';
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'bills'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE bills';
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'notifications'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE notifications';
+  END IF;
+END $$;
 
--- Ensure logo_url exists even if table was created earlier
-ALTER TABLE hospital_settings ADD COLUMN IF NOT EXISTS logo_url TEXT;
+----------------------------------------------------
+-- STORAGE BUCKETS & STORAGE OBJECT POLICIES
+----------------------------------------------------
 
--- Pre-populate the single row if it doesn't exist
-INSERT INTO hospital_settings (id, name, address, contact_info)
-VALUES (1, 'Smart Hospital', '123 Health Ave, Medical District', 'Phone: +880-1234-567890 | Email: contact@smarthospital.com')
-ON CONFLICT (id) DO NOTHING;
-
--- Policies for hospital_settings
-ALTER TABLE hospital_settings ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow authenticated read access" ON hospital_settings;
-DROP POLICY IF EXISTS "Allow admin/manager update" ON hospital_settings;
-
-CREATE POLICY "Allow authenticated read access" ON hospital_settings FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow admin/manager update" ON hospital_settings FOR UPDATE USING (public.get_my_role() IN ('super_admin', 'diag_manager'));
-
--- STORAGE BUCKET SETUP
 -- 1. Create the bucket
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('branding', 'branding', true) 
@@ -478,3 +591,75 @@ USING (
   bucket_id = 'branding' AND 
   public.get_my_role() IN ('super_admin', 'diag_manager')
 );
+
+----------------------------------------------------
+-- SEED DEFAULT SUPER ADMIN USER
+----------------------------------------------------
+-- 1. Insert into auth.users (Supabase managed authentication table)
+INSERT INTO auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  recovery_sent_at,
+  last_sign_in_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token
+)
+SELECT 
+  '00000000-0000-0000-0000-000000000000',
+  gen_random_uuid(),
+  'authenticated',
+  'authenticated',
+  'joyonto.karmakar.std@gmail.com',
+  crypt('SuperAdmin@1234', gen_salt('bf')),
+  now(),
+  NULL,
+  NULL,
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Super Admin","role":"super_admin"}'::jsonb,
+  now(),
+  now(),
+  '',
+  '',
+  '',
+  ''
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users WHERE email = 'joyonto.karmakar.std@gmail.com'
+);
+
+-- 2. Fallback: Directly insert into public.profiles to ensure it exists
+INSERT INTO public.profiles (
+  id,
+  full_name,
+  email,
+  role,
+  status,
+  notify_new_visits,
+  notify_new_tests,
+  notify_own_visits_only,
+  notify_own_tests_only
+)
+SELECT 
+  id,
+  'Super Admin',
+  'joyonto.karmakar.std@gmail.com',
+  'super_admin',
+  'active',
+  false,
+  false,
+  false,
+  false
+FROM auth.users
+WHERE email = 'joyonto.karmakar.std@gmail.com'
+ON CONFLICT (id) DO UPDATE SET role = 'super_admin';
+
