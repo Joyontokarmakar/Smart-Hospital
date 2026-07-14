@@ -595,6 +595,9 @@ USING (
 ----------------------------------------------------
 -- SEED DEFAULT SUPER ADMIN USER
 ----------------------------------------------------
+-- 0. Clean up existing seed user to ensure fresh recreation
+DELETE FROM auth.users WHERE email = 'joyonto.karmakar.std@gmail.com';
+
 -- 1. Insert into auth.users (Supabase managed authentication table)
 INSERT INTO auth.users (
   instance_id,
