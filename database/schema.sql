@@ -637,7 +637,33 @@ WHERE NOT EXISTS (
   SELECT 1 FROM auth.users WHERE email = 'joyonto.karmakar.std@gmail.com'
 );
 
--- 2. Fallback: Directly insert into public.profiles to ensure it exists
+-- 2. Insert into auth.identities (Required by GoTrue to find the email provider during sign-in)
+INSERT INTO auth.identities (
+  id,
+  user_id,
+  provider_id,
+  identity_data,
+  provider,
+  last_sign_in_at,
+  created_at,
+  updated_at
+)
+SELECT 
+  id,
+  id,
+  id,
+  format('{"sub":"%s","email":"%s"}', id::text, email)::jsonb,
+  'email',
+  now(),
+  now(),
+  now()
+FROM auth.users
+WHERE email = 'joyonto.karmakar.std@gmail.com'
+  AND NOT EXISTS (
+    SELECT 1 FROM auth.identities WHERE user_id = auth.users.id
+  );
+
+-- 3. Fallback: Directly insert into public.profiles to ensure it exists
 INSERT INTO public.profiles (
   id,
   full_name,
@@ -662,4 +688,5 @@ SELECT
 FROM auth.users
 WHERE email = 'joyonto.karmakar.std@gmail.com'
 ON CONFLICT (id) DO UPDATE SET role = 'super_admin';
+
 
