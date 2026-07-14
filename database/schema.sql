@@ -692,4 +692,28 @@ FROM auth.users
 WHERE email = 'joyonto.karmakar.std@gmail.com'
 ON CONFLICT (id) DO UPDATE SET role = 'super_admin';
 
+----------------------------------------------------
+-- RESTORE DEFAULT SUPABASE ROLE PERMISSIONS
+----------------------------------------------------
+-- 1. Grant usage on public schema
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- 2. Grant table and sequence permissions (RLS still handles row-level access)
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO postgres, service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+
+-- 3. Grant execution permissions on functions
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, anon;
+
+-- 4. Set default privileges for any future tables/functions
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO authenticated, anon;
+
+
 
