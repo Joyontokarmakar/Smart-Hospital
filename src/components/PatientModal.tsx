@@ -37,7 +37,7 @@ export function PatientModal({ isOpen, onClose, onSuccess }: PatientModalProps) 
         .from('patients')
         .select('id')
         .eq('phone', formData.phone)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         throw new Error('A patient with this phone number is already registered.');

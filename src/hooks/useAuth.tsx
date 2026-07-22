@@ -49,16 +49,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (!error && data) {
-      setProfile(data as Profile);
+      if (error) {
+        console.error('Error fetching profile:', error);
+        await supabase.auth.signOut();
+        setProfile(null);
+      } else if (data) {
+        setProfile(data as Profile);
+      } else {
+        console.warn('No profile found for authenticated user, signing out to prevent loading hang.');
+        await supabase.auth.signOut();
+        setProfile(null);
+      }
+    } catch (err) {
+      console.error('Exception in fetchProfile:', err);
+      await supabase.auth.signOut();
+      setProfile(null);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const signOut = async () => {

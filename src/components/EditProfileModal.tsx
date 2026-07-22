@@ -74,8 +74,8 @@ export function EditProfileModal({ isOpen, onClose, onSuccess, userId }: EditPro
           .from('doctors_info')
           .select('*')
           .eq('id', userId)
-          .single();
-        if (dError && dError.code !== 'PGRST116') {
+          .maybeSingle();
+        if (dError) {
           console.error("Doctor info error", dError);
         } else {
           doctorData = dData;

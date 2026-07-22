@@ -221,11 +221,16 @@ CREATE TRIGGER on_auth_user_created
 -- Security definer function to get the user's role safely
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS text
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM profiles WHERE id = auth.uid();
+DECLARE
+  user_role text;
+BEGIN
+  SELECT role INTO user_role FROM public.profiles WHERE id = auth.uid();
+  RETURN user_role;
+END;
 $$;
 
 ----------------------------------------------------
@@ -378,7 +383,7 @@ CREATE POLICY "Allow users to update own notifications" ON public.notifications 
 
 -- 10. Hospital Settings Policies
 DROP POLICY IF EXISTS "Allow authenticated read access" ON public.hospital_settings;
-CREATE POLICY "Allow authenticated read access" ON public.hospital_settings FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow public read access" ON public.hospital_settings FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Allow admin/manager update" ON public.hospital_settings;
 CREATE POLICY "Allow admin/manager update" ON public.hospital_settings FOR UPDATE USING (public.get_my_role() IN ('super_admin', 'diag_manager'));

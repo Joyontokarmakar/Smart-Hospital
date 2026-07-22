@@ -130,7 +130,7 @@ export default function Booking() {
       let patientId = selectedPatient?.id;
 
       if (!patientId) {
-        const { data: existing } = await supabase.from('patients').select('id').eq('phone', patientForm.phone).single();
+        const { data: existing } = await supabase.from('patients').select('id').eq('phone', patientForm.phone).maybeSingle();
         if (existing) {
           patientId = existing.id;
         } else {
@@ -228,7 +228,7 @@ export default function Booking() {
     try {
       let patientId = selectedPatient?.id;
       if (!patientId) {
-        const { data: existing } = await supabase.from('patients').select('id').eq('phone', patientForm.phone).single();
+        const { data: existing } = await supabase.from('patients').select('id').eq('phone', patientForm.phone).maybeSingle();
         if (existing) {
           patientId = existing.id;
         } else {

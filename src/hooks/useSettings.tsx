@@ -20,7 +20,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         .from('hospital_settings')
         .select('*')
         .eq('id', 1)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching hospital settings:', error);
