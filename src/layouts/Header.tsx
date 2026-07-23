@@ -205,6 +205,32 @@ export function Header() {
 
       <div className="flex items-center justify-end w-full md:w-auto gap-4">
         
+        {/* Database connection indicator / toggle */}
+        <button 
+          onClick={() => {
+            const currentMode = localStorage.getItem('hospital_db_mode') || 'local';
+            const newMode = currentMode === 'supabase' ? 'local' : 'supabase';
+            localStorage.setItem('hospital_db_mode', newMode);
+            window.location.reload();
+          }}
+          title={`Active Database: ${(localStorage.getItem('hospital_db_mode') || 'local') === 'supabase' ? 'Cloud (Supabase)' : 'Local Server (Offline LAN)'}. Click to switch.`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-sm ${
+            (localStorage.getItem('hospital_db_mode') || 'local') === 'supabase'
+              ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300'
+              : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
+          }`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+              (localStorage.getItem('hospital_db_mode') || 'local') === 'supabase' ? 'bg-blue-400' : 'bg-emerald-400'
+            }`}></span>
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${
+              (localStorage.getItem('hospital_db_mode') || 'local') === 'supabase' ? 'bg-blue-500' : 'bg-emerald-500'
+            }`}></span>
+          </span>
+          <span>{(localStorage.getItem('hospital_db_mode') || 'local') === 'supabase' ? 'Cloud Mode' : 'LAN Offline'}</span>
+        </button>
+
         {/* Navigation / Notifications Dropdown */}
         <div className="relative" ref={panelRef}>
           <button 
